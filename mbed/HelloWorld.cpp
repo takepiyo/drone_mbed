@@ -10,43 +10,60 @@
 #include <std_msgs/Float32.h>
 #include <std_msgs/UInt32.h>
 
-#include <string>
-using std::string;
+#define PERIOD  10
+#define MIN_DUTY 0.11  //Period 10ms
+#define MAX_DUTY 0.21  //Period 10ms
 
-#define PERIOD  20
-
-ros::NodeHandle nh;
-// geometry_msgs::Pose2D pose;
-std_msgs::Float32 duty;
-ros::Publisher pub("now_duty", &duty);
-
+// mbed variables
 DigitalOut led1 = LED1;
 DigitalOut led2 = LED2;
-std_msgs::UInt32 cnt;
+PwmOut motor1(p21);
 
-// std_msgs::String str_msg;
+// ros variables
+ros::NodeHandle nh;
+std_msgs::Float32 duty;
+ros::Publisher pub("now_duty", &duty);
+std_msgs::UInt32 cnt;
 ros::Publisher chatter("chatter", &cnt);
 
-// char hello[13] = "hello world!";
+void write_duty(float value)
+{
+    if(value > MAX_DUTY){value = MAX_DUTY;}
+    if(value < MIN_DUTY){value = MIN_DUTY;}
+    motor1.write(value);
+}
 
 void update_duty(const std_msgs::Float32& input_duty)
 {
-    duty.data = input_duty.data;
-    pub.publish(&duty);
+    write_duty(input_duty.data);
+    pub.publish(&input_duty);
     chatter.publish(&cnt);
     led1 = !led1;   
     cnt.data = cnt.data + 1;
 }
-
 ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
 
-int main()
+void init_mbed()
+{
+    motor1.period_ms(PERIOD);
+    write_duty(0.1);  //esc is initialized by 10% duty
+    wait_ms(1000);
+}
+
+void init_ros()
 {
     nh.initNode();
     nh.advertise(pub);
     nh.subscribe(sub);
     nh.advertise(chatter);
     cnt.data = 0;
+    duty.data = 0.0;
+}
+
+int main()
+{
+    init_ros();
+    init_mbed();
     while(1)
     {
         nh.spinOnce();

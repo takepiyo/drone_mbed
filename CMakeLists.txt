@@ -204,3 +204,8 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+add_executable(basic_twist_publisher src/basic_twist_publisher.cpp)
+
+target_link_libraries(basic_twist_publisher
+  ${catkin_LIBRARIES}
+)

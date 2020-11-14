@@ -70,4 +70,5 @@ int main()
         wait_ms(10);
         led2 = !led2;
     }
+    return 0;
 }

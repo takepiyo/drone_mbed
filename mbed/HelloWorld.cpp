@@ -23,8 +23,8 @@ PwmOut motor1(p21);
 ros::NodeHandle nh;
 std_msgs::Float32 duty;
 ros::Publisher pub("now_duty", &duty);
-std_msgs::UInt32 cnt;
-ros::Publisher chatter("chatter", &cnt);
+// std_msgs::UInt32 cnt;
+// ros::Publisher chatter("chatter", &cnt);
 
 void write_duty(std_msgs::Float32 input_duty)
 {
@@ -36,9 +36,9 @@ void write_duty(std_msgs::Float32 input_duty)
 void update_duty(const std_msgs::Float32& input_duty)
 {
     write_duty(input_duty);
-    chatter.publish(&cnt);
+    // chatter.publish(&cnt);
     led1 = !led1;   
-    cnt.data = cnt.data + 1;
+    // cnt.data = cnt.data + 1;
 }
 ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
 
@@ -48,7 +48,7 @@ void init_mbed()
     initial_duty.data = 0.1;
     motor1.period_ms(PERIOD);
     write_duty(initial_duty);  //esc is initialized by 10% duty
-    wait_ms(1000);
+    wait_ms(500);
 }
 
 void init_ros()
@@ -56,8 +56,8 @@ void init_ros()
     nh.initNode();
     nh.advertise(pub);
     nh.subscribe(sub);
-    nh.advertise(chatter);
-    cnt.data = 0;
+    // nh.advertise(chatter);
+    // cnt.data = 0;
     duty.data = 0.0;
 }
 

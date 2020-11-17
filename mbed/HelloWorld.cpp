@@ -6,12 +6,8 @@
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
 
-// #include <bits/stdc++.h>
-// using namespace std;
-
-#define PERIOD  10
-#define MIN_DUTY 0.10  //Period 10ms
-#define MAX_DUTY 0.21  //Period 10ms
+#include <bits/stdc++.h>
+using namespace std;
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -26,14 +22,14 @@ ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
 
-// void publish_string(string message)
-// {
-//     int length = message.length();
-//     char char_array[length + 1];
-//     strcpy(char_array, message.c_str());
-//     echo.data = char_array;
-//     debugger.publish(&echo);
-// }
+void publish_string(string message)
+{
+    int length = message.length();
+    char char_array[length + 1];
+    strcpy(char_array, message.c_str());
+    echo.data = char_array;
+    debugger.publish(&echo);
+}
 
 // void init_duty()
 // {
@@ -61,29 +57,34 @@ ros::Publisher debugger("debug_message", &echo);
 
 void init_mbed()
 {
-    // publish_string("initialize mbed...");
+    publish_string("initialize mbed...");
+    duties.data_length = 4;
+    duties.data = (float *)malloc(sizeof(float)*4);
     wait_ms(500);
 }
 
 void init_ros()
 {
-    // publish_string("initialize ros...");
     nh.initNode();
     nh.advertise(duties_pub);
     nh.advertise(debugger);
+    publish_string("finish ros_init!!!");
     // nh.subscribe(sub);
 }
 
 int main()
 {
+    led1 = 0;
     init_ros();
     init_mbed();
-    // publish_string("start loop!");
+    led1 = 1;
+    publish_string("start loop!");
     while(1)
     {
         nh.spinOnce();
-        wait_ms(1);
         led2 = !led2;
+        publish_string("loop!");
+        wait_ms(1);
     }
     return 0;
 }

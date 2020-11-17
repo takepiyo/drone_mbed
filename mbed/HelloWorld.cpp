@@ -5,6 +5,7 @@
 
 #include "mbed.h"
 #include <ros.h>
+#include <BMI088.h>
 #include <geometry_msgs/Pose2D.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Float32.h>

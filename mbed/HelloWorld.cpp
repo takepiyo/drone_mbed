@@ -35,11 +35,12 @@ void publish_string(string message)
     debugger.publish(&echo);
 }
 
-void write_duty(std_msgs::Float32 input_duty)
+void init_duty()
 {
-    input_duty.data = (MAX_DUTY - MIN_DUTY) * input_duty.data + MIN_DUTY;
-    motor1.write(input_duty.data);
-    pub.publish(&input_duty);
+    motor1.period_ms(PERIOD);
+    std_msgs::Float32 initial_duty;
+    initial_duty.data = 0.1;  //esc is initialized by 10% duty
+    write_duty(initial_duty);  
 }
 
 void update_duty(const std_msgs::Float32& input_duty)
@@ -51,13 +52,17 @@ void update_duty(const std_msgs::Float32& input_duty)
 }
 ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
 
+void write_duty(std_msgs::Float32 input_duty)
+{
+    input_duty.data = (MAX_DUTY - MIN_DUTY) * input_duty.data + MIN_DUTY;
+    motor1.write(input_duty.data);
+    pub.publish(&input_duty);
+}
+
 void init_mbed()
 {
     publish_string("initialize mbed...");
-    std_msgs::Float32 initial_duty;
-    initial_duty.data = 0.1;
-    motor1.period_ms(PERIOD);
-    write_duty(initial_duty);  //esc is initialized by 10% duty
+    init_duty();
     wait_ms(500);
 }
 

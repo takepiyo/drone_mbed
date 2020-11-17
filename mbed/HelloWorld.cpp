@@ -6,6 +6,9 @@
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
 
+// #include <bits/stdc++.h>
+// using namespace std;
+
 #define PERIOD  10
 #define MIN_DUTY 0.10  //Period 10ms
 #define MAX_DUTY 0.21  //Period 10ms
@@ -23,11 +26,14 @@ ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
 
-void publish_string(char* message)
-{
-    echo.data = message;
-    debugger.publish(&echo);
-}
+// void publish_string(string message)
+// {
+//     int length = message.length();
+//     char char_array[length + 1];
+//     strcpy(char_array, message.c_str());
+//     echo.data = char_array;
+//     debugger.publish(&echo);
+// }
 
 // void init_duty()
 // {
@@ -55,13 +61,13 @@ void publish_string(char* message)
 
 void init_mbed()
 {
-    publish_string("initialize mbed...");
+    // publish_string("initialize mbed...");
     wait_ms(500);
 }
 
 void init_ros()
 {
-    publish_string("initialize ros...");
+    // publish_string("initialize ros...");
     nh.initNode();
     nh.advertise(duties_pub);
     nh.advertise(debugger);
@@ -72,7 +78,7 @@ int main()
 {
     init_ros();
     init_mbed();
-    publish_string("start loop!");
+    // publish_string("start loop!");
     while(1)
     {
         nh.spinOnce();

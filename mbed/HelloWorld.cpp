@@ -26,6 +26,14 @@ std_msgs::Float32 duty;
 ros::Publisher pub("now_duty", &duty);
 // std_msgs::UInt32 cnt;
 // ros::Publisher chatter("chatter", &cnt);
+std_msgs::String echo;
+ros::Publisher debugger("debug_message", &echo); 
+
+void publish_string(string message)
+{
+    echo.data = message;
+    debugger.publish(&echo);
+}
 
 void write_duty(std_msgs::Float32 input_duty)
 {
@@ -45,6 +53,7 @@ ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
 
 void init_mbed()
 {
+    publish_string("initialize mbed...");
     std_msgs::Float32 initial_duty;
     initial_duty.data = 0.1;
     motor1.period_ms(PERIOD);
@@ -54,6 +63,7 @@ void init_mbed()
 
 void init_ros()
 {
+    publish_string("initialize ros...");
     nh.initNode();
     nh.advertise(pub);
     nh.subscribe(sub);
@@ -66,6 +76,7 @@ int main()
 {
     init_ros();
     init_mbed();
+    publish_string("start loop!")
     while(1)
     {
         nh.spinOnce();

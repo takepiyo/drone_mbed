@@ -1,3 +1,5 @@
 mbed/LPC1768/rosserial_mbed_HelloWorld.elf
 mbed/LPC1768/rosserial_mbed_HelloWorld.map
+mbed/LPC1768/esc.d
+mbed/LPC1768/esc.o
 ros_for_mbed/lib/ros_lib/Release/

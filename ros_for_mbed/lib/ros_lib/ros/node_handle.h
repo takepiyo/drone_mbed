@@ -103,7 +103,7 @@ namespace ros
   class NodeHandle_ : public NodeHandleBase_
   {
   protected:
-    Hardware hardware_{p28, p28, 115200};
+    Hardware hardware_{p28, p27, 115200};
 
     /* time used for syncing */
     uint32_t rt_time{0};

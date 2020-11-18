@@ -3,10 +3,9 @@
 #include <BMI088.h>
 #include <Esc.h>
 #include <std_msgs/String.h>
-#include <std_msgs/Float32.h>
-// #include "std_msgs/MultiArrayLayout.h"
-// #include "std_msgs/MultiArrayDimension.h"
-// #include <std_msgs/Float32MultiArray.h>
+#include "std_msgs/MultiArrayLayout.h"
+#include "std_msgs/MultiArrayDimension.h"
+#include <std_msgs/Float32MultiArray.h>
 
 #include <geometry_msgs/Accel.h>
 
@@ -26,7 +25,7 @@ BMI088 bmi088;
 
 // ros variables
 ros::NodeHandle nh;
-std_msgs::Float32 duties;
+std_msgs::Float32MultiArray duties;
 ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
@@ -59,38 +58,14 @@ void get_acc_gyro()
     acc_gyro.publish(&accel);
 }
 
-void update_motor_rotation(const std_msgs::Float32& duties)
+void update_motor_rotation(const std_msgs::Float32MultiArray& duties)
 {
-    motor[0].update(duties.data);
-    motor[1].update(duties.data);
-    motor[2].update(duties.data);
-    motor[3].update(duties.data);
+    for(int i=0; i<MOTOR_NUM; i++)
+    {
+        motor[i].update(duties.data[i]);
+    }
 }
-ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_motor_rotation);
-
-// void init_duty()
-// {
-//     motor1.period_ms(PERIOD);
-//     std_msgs::Float32 initial_duty;
-//     initial_duty.data = 0.1;  //esc is initialized by 10% duty
-//     write_duty(initial_duty);  
-// }
-
-// void update_duty(const std_msgs::Float32& input_duty)
-// {
-//     write_duty(input_duty);
-//     // chatter.publish(&cnt);
-//     led1 = !led1;   
-//     // cnt.data = cnt.data + 1;
-// }
-//ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
-
-// void write_duty(std_msgs::Float32 input_duty)
-// {
-//     input_duty.data = (MAX_DUTY - MIN_DUTY) * input_duty.data + MIN_DUTY;
-//     motor1.write(input_duty.data);
-//     pub.publish(&input_duty);
-// }
+ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_motor_rotation);
 
 void init_mbed()
 {
@@ -109,8 +84,8 @@ void init_mbed()
         wait_ms(200);
     }
     led3 = 1;    
-    // duties.data_length = MOTOR_NUM;
-    // duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
+    duties.data_length = MOTOR_NUM;
+    duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
 }
 
 void init_ros()
@@ -134,7 +109,7 @@ int main()
     {
         nh.spinOnce();
         led2 = !led2;
-        // get_acc_gyro();
+        get_acc_gyro();
         // publish_string("loop!");
         wait_ms(10);
     }

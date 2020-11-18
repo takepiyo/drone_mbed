@@ -3,13 +3,12 @@
 #include <BMI088.h>
 #include <Esc.h>
 #include <std_msgs/String.h>
-// #include <std_msgs/Float32.h>
+#include <std_msgs/Float32.h>
 // #include "std_msgs/MultiArrayLayout.h"
 // #include "std_msgs/MultiArrayDimension.h"
 // #include <std_msgs/Float32MultiArray.h>
 
 #include <geometry_msgs/Accel.h>
-#include <geometry_msgs/Quaternion.h>
 
 #include <vector>
 #include <bits/stdc++.h>
@@ -27,9 +26,7 @@ BMI088 bmi088;
 
 // ros variables
 ros::NodeHandle nh;
-// std_msgs::Float32MultiArray duties;
-// ros::Publisher duties_pub("now_duty", &duties);
-geometry_msgs::Quaternion duties;
+std_msgs::Float32 duties;
 ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
@@ -62,14 +59,14 @@ void get_acc_gyro()
     acc_gyro.publish(&accel);
 }
 
-void update_motor_rotation(const geometry_msgs::Quaternion& duties)
+void update_motor_rotation(const std_msgs::Float32& duties)
 {
-    motor[0].update(duties.x);
-    motor[1].update(duties.y);
-    motor[2].update(duties.z);
-    motor[3].update(duties.w);
+    motor[0].update(duties.data);
+    motor[1].update(duties.data);
+    motor[2].update(duties.data);
+    motor[3].update(duties.data);
 }
-ros::Subscriber<geometry_msgs::Quaternion> duties_sub("input_duties", &update_motor_rotation);
+ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_motor_rotation);
 
 // void init_duty()
 // {
@@ -137,9 +134,9 @@ int main()
     {
         nh.spinOnce();
         led2 = !led2;
-        get_acc_gyro();
+        // get_acc_gyro();
         // publish_string("loop!");
-        wait_ms(1000);
+        wait_ms(10);
     }
     return 0;
 }

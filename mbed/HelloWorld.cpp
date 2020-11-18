@@ -3,24 +3,33 @@
 #include <BMI088.h>
 #include <Esc.h>
 #include <std_msgs/String.h>
-#include <std_msgs/Float32.h>
-#include <std_msgs/Float32MultiArray.h>
-#include <geometry_msgs/Accel.h>
+// #include <std_msgs/Float32.h>
+// #include "std_msgs/MultiArrayLayout.h"
+// #include "std_msgs/MultiArrayDimension.h"
+// #include <std_msgs/Float32MultiArray.h>
 
+#include <geometry_msgs/Accel.h>
+#include <geometry_msgs/Quaternion.h>
+
+#include <vector>
 #include <bits/stdc++.h>
 using namespace std;
+
+#define MOTOR_NUM 4
 
 // mbed variables
 DigitalOut led1 = LED1;
 DigitalOut led2 = LED2;
 DigitalOut led3 = LED3;
 
-Esc motor[4] = {p25, p24, p23, p22};
+Esc motor[MOTOR_NUM] = {p25, p24, p23, p22};
 BMI088 bmi088;
 
 // ros variables
 ros::NodeHandle nh;
-std_msgs::Float32MultiArray duties;
+// std_msgs::Float32MultiArray duties;
+// ros::Publisher duties_pub("now_duty", &duties);
+geometry_msgs::Quaternion duties;
 ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
@@ -53,6 +62,15 @@ void get_acc_gyro()
     acc_gyro.publish(&accel);
 }
 
+void update_motor_rotation(const geometry_msgs::Quaternion& duties)
+{
+    motor[0].update(duties.x);
+    motor[1].update(duties.y);
+    motor[2].update(duties.z);
+    motor[3].update(duties.w);
+}
+ros::Subscriber<geometry_msgs::Quaternion> duties_sub("input_duties", &update_motor_rotation);
+
 // void init_duty()
 // {
 //     motor1.period_ms(PERIOD);
@@ -68,7 +86,7 @@ void get_acc_gyro()
 //     led1 = !led1;   
 //     // cnt.data = cnt.data + 1;
 // }
-// ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
+//ros::Subscriber<std_msgs::Float32> sub("input_duty", &update_duty);
 
 // void write_duty(std_msgs::Float32 input_duty)
 // {
@@ -94,8 +112,8 @@ void init_mbed()
         wait_ms(200);
     }
     led3 = 1;    
-    duties.data_length = 4;
-    duties.data = (float *)malloc(sizeof(float)*4);
+    // duties.data_length = MOTOR_NUM;
+    // duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
 }
 
 void init_ros()
@@ -105,7 +123,7 @@ void init_ros()
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
     // publish_string("finish ros_init!!!");
-    // nh.subscribe(sub);
+    nh.subscribe(duties_sub);
 }
 
 int main()

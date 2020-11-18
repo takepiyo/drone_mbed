@@ -1,7 +1,6 @@
 #include "mbed.h"
 #include <ros.h>
 #include <Esc.h>
-#include <std_msgs/Float32.h>
 
 Esc::Esc(PinName pwm_pin) : PwmOut(pwm_pin)
 {
@@ -14,9 +13,9 @@ Esc::~Esc()
 
 }
 
-void Esc::update(std_msgs::Float32 input)
+void Esc::update(float input)
 {
-   _write(input.data);
+   _write(input);
 }
 
 void Esc::stop()

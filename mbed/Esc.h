@@ -1,6 +1,5 @@
 #include "mbed.h"
 #include <ros.h>
-#include <std_msgs/Float32.h>
 
 #define PERIOD  10
 #define MIN_DUTY 0.10  //Period 10ms
@@ -12,7 +11,7 @@ class Esc : public PwmOut
   public:
   Esc(PinName pwm_pin);
   ~Esc();
-  void update(std_msgs::Float32 input);
+  void update(float input);
   void stop();
 
   private:

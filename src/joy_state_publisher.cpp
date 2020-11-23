@@ -12,11 +12,10 @@ ros::Subscriber joy_sub;
 
 void joy_callback(const sensor_msgs::Joy& joy_msg)
 {
-  duties.data[0] = joy_msg.axes[0];
+  duties.data[0] = joy_msg.axes[1];
   duties.data[1] = joy_msg.axes[1];
-  duties.data[2] = joy_msg.axes[3];
-  duties.data[3] = joy_msg.axes[4];
-  cmd_pub.publish(duties);
+  duties.data[2] = joy_msg.axes[1];
+  duties.data[3] = joy_msg.axes[1];
 }
 
 int main(int argc, char** argv)
@@ -31,6 +30,7 @@ int main(int argc, char** argv)
   while (ros::ok())
   {
     ros::spinOnce();
+    cmd_pub.publish(duties);
     loop_rate.sleep();
   }
   return 0;

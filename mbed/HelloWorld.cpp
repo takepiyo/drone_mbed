@@ -19,6 +19,7 @@ using namespace std;
 DigitalOut led1 = LED1;
 DigitalOut led2 = LED2;
 DigitalOut led3 = LED3;
+DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p23, p22};
 BMI088 bmi088;
@@ -58,18 +59,25 @@ void get_acc_gyro()
     acc_gyro.publish(&accel);
 }
 
-void update_motor_rotation(const std_msgs::Float32MultiArray& duties)
+void update_duties(const std_msgs::Float32MultiArray& input_duties)
 {
-    for(int i=0; i<MOTOR_NUM; i++)
-    {
-        motor[i].update(duties.data[i]);
-    }
+    duties = input_duties;
+    led4 = !led4;
 }
-ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_motor_rotation);
+
+void update_motor_rotation()
+{
+    motor[0].update(duties.data[0]);
+    motor[1].update(duties.data[1]);
+    motor[2].update(duties.data[2]);
+    motor[3].update(duties.data[3]);
+}
+ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_duties);
 
 void init_mbed()
 {
     led3 = 0;
+    led4 = 0;
     // publish_string("initialize mbed...");
     while (1) 
     {
@@ -110,6 +118,7 @@ int main()
         nh.spinOnce();
         led2 = !led2;
         get_acc_gyro();
+        update_motor_rotation();
         // publish_string("loop!");
         wait_ms(10);
     }

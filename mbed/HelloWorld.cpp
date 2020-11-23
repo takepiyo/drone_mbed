@@ -71,6 +71,7 @@ void update_motor_rotation()
     motor[1].update(duties.data[1]);
     motor[2].update(duties.data[2]);
     motor[3].update(duties.data[3]);
+    duties_pub.publish(&duties);
 }
 ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_duties);
 
@@ -94,6 +95,10 @@ void init_mbed()
     led3 = 1;    
     duties.data_length = MOTOR_NUM;
     duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
+    for(int i=0; i < MOTOR_NUM; i++)
+    {
+        duties.data[i] = 0.0;
+    }
 }
 
 void init_ros()
@@ -120,7 +125,7 @@ int main()
         get_acc_gyro();
         update_motor_rotation();
         // publish_string("loop!");
-        wait_ms(10);
+        wait_ms(100);
     }
     return 0;
 }

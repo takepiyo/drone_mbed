@@ -40,7 +40,7 @@
 
 namespace ros
 {
-  typedef NodeHandle_<MbedHardware, 5, 5, 4096, 4096> NodeHandle;
+  typedef NodeHandle_<MbedHardware, 25, 25, 2048, 2048> NodeHandle;
 }
 
 #endif

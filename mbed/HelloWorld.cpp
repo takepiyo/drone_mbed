@@ -120,12 +120,12 @@ int main()
     // publish_string("start loop!");
     while(1)
     {
-        nh.spinOnce();
-        led2 = !led2;
         get_acc_gyro();
         update_motor_rotation();
         // publish_string("loop!");
-        wait_ms(100);
+        nh.spinOnce();
+        wait_ms(10);
+        led2 = !led2;
     }
     return 0;
 }

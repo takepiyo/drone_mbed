@@ -3,8 +3,7 @@
 #include <BMI088.h>
 #include <Esc.h>
 #include <std_msgs/String.h>
-#include "std_msgs/MultiArrayLayout.h"
-#include "std_msgs/MultiArrayDimension.h"
+#include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
 
 #include <geometry_msgs/Accel.h>
@@ -21,12 +20,14 @@ DigitalOut led2 = LED2;
 DigitalOut led3 = LED3;
 DigitalOut led4 = LED4;
 
-Esc motor[MOTOR_NUM] = {p25, p24, p23, p22};
+Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
 BMI088 bmi088;
+// Esc motor(p24);
 
 // ros variables
 ros::NodeHandle nh;
-std_msgs::Float32MultiArray duties;
+// std_msgs::Float32MultiArray duties;
+std_msgs::Float32 duties;
 ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
@@ -59,7 +60,8 @@ void get_acc_gyro()
     acc_gyro.publish(&accel);
 }
 
-void update_duties(const std_msgs::Float32MultiArray& input_duties)
+// void update_duties(const std_msgs::Float32MultiArray& input_duties)
+void update_duties(const std_msgs::Float32& input_duties)
 {
     duties = input_duties;
     led4 = !led4;
@@ -67,38 +69,41 @@ void update_duties(const std_msgs::Float32MultiArray& input_duties)
 
 void update_motor_rotation()
 {
-    motor[0].update(duties.data[0]);
-    motor[1].update(duties.data[1]);
-    motor[2].update(duties.data[2]);
-    motor[3].update(duties.data[3]);
+    motor[0].update(duties.data);
+    motor[1].update(duties.data);
+    motor[2].update(duties.data);
+    motor[3].update(duties.data);
+    // motor.update(duties.data);
     duties_pub.publish(&duties);
 }
-ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_duties);
+// ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_duties);
+ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_duties);
 
 void init_mbed()
 {
     led3 = 0;
     led4 = 0;
-    // publish_string("initialize mbed...");
+    publish_string("initialize mbed...");
     while (1) 
     {
         if (bmi088.isConnection()) {
             bmi088.initialize();
-            // publish_string("BMI088 is connected");
+            publish_string("BMI088 is connected");
             break;
         } else {
-            // publish_string("BMI088 is not connected");
+            publish_string("BMI088 is not connected");
         }
         led3 = !led3;
         wait_ms(200);
     }
     led3 = 1;    
-    duties.data_length = MOTOR_NUM;
-    duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
-    for(int i=0; i < MOTOR_NUM; i++)
-    {
-        duties.data[i] = 0.0;
-    }
+    // duties.data_length = MOTOR_NUM;
+    // duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
+    // for(int i=0; i < MOTOR_NUM; i++)
+    // {
+    //     duties.data[i] = 0.0;
+    // }
+    duties.data = 0.0;
 }
 
 void init_ros()
@@ -107,7 +112,7 @@ void init_ros()
     nh.advertise(duties_pub);
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
-    // publish_string("finish ros_init!!!");
+    publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
 
@@ -117,12 +122,12 @@ int main()
     init_ros();
     init_mbed();
     led1 = 1;
-    // publish_string("start loop!");
+    publish_string("start loop!");
     while(1)
     {
         get_acc_gyro();
         update_motor_rotation();
-        // publish_string("loop!");
+        publish_string("loop!");
         nh.spinOnce();
         wait_ms(10);
         led2 = !led2;

@@ -10,6 +10,8 @@
 
 #include <vector>
 #include <bits/stdc++.h>
+#include "Eigen/Dense.h"
+
 using namespace std;
 
 #define MOTOR_NUM 4

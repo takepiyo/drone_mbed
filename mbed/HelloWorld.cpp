@@ -2,6 +2,7 @@
 #include <ros.h>
 #include <BMI088.h>
 #include <Esc.h>
+#include <ExtendedKalmanFilter.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
@@ -10,9 +11,6 @@
 
 #include <vector>
 #include <bits/stdc++.h>
-#include "Eigen/Dense.h"
-
-using namespace std;
 
 #define MOTOR_NUM 4
 

@@ -44,6 +44,8 @@
 
 #include "ros/msg.h"
 
+#include "mbed.h"
+
 namespace ros
 {
 

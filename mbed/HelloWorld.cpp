@@ -21,8 +21,7 @@ DigitalOut led3 = LED3;
 DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
-BMI088 bmi088;
-// Esc motor(p24);
+BMI088 bmi088(p9, p10);
 
 // ros variables
 ros::NodeHandle nh;

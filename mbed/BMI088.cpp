@@ -29,7 +29,7 @@
 
 #include "BMI088.h"
 
-BMI088::BMI088(void) : i2c(p9, p10)
+BMI088::BMI088(PinName sda, PinName scl) : i2c(sda, scl)
 {
   devAddrAcc = BMI088_ACC_ADDRESS;
   devAddrGyro = BMI088_GYRO_ADDRESS;

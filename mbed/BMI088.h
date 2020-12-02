@@ -159,7 +159,7 @@ enum gyro_power_type_t
 class BMI088
 {
 public:
-  BMI088(void);
+  BMI088(PinName sda, PinName scl);
 
   bool isConnection(void);
 

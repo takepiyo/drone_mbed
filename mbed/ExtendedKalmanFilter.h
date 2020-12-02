@@ -8,12 +8,13 @@ class Ekf
 {
   public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  Ekf(float delta_t);
+  Ekf(double delta_t);
   ~Ekf();
   geometry_msgs::Vector3 get_corrected(const geometry_msgs::Vector3& linear_acc,
                                        const geometry_msgs::Vector3& angular_vel);
   private:
-  float _delta_t;
+  double _delta_t;
+  double _yaw;
 
   // input values
   Matrix<double, 3, 1> _linear_acc;  //  m/s^2

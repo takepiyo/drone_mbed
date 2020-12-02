@@ -1,18 +1,25 @@
 #include "mbed.h"
-#include <ros.h>
+
 #include <BMI088.h>
 #include <Esc.h>
 #include <ExtendedKalmanFilter.h>
+
+#include <ros.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
 
 #include <geometry_msgs/Accel.h>
+#include <geometry_msgs/Vector3.h>
 
 #include <vector>
 #include <bits/stdc++.h>
 
 #define MOTOR_NUM 4
+#define PERIOD    0.01
+
+// declare functions
+void update_pose();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -22,6 +29,9 @@ DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
 BMI088 bmi088(p9, p10);
+Ekf    ex_kalman_filter(PERIOD);
+
+Ticker timer;
 
 // ros variables
 ros::NodeHandle nh;
@@ -32,6 +42,11 @@ std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
 geometry_msgs::Accel accel;
 ros::Publisher acc_gyro("acc_gyro", &accel);
+geometry_msgs::Vector3 linear_acc;
+geometry_msgs::Vector3 angular_vel;
+geometry_msgs::Vector3 RPY_angle;
+ros::Publisher RPY_pub("RPY_angle", &RPY_angle);
+// tf2::Quaternion quaternion;
 
 void publish_string(string message)
 {
@@ -48,14 +63,21 @@ void get_acc_gyro()
     float gx = 0, gy = 0, gz = 0;
     bmi088.getAcceleration(&ax, &ay, &az);
     bmi088.getGyroscope(&gx, &gy, &gz);
-    accel.linear.x = ax;
-    accel.linear.y = ay;
-    accel.linear.z = az;
-    accel.angular.x = gx;
-    accel.angular.y = gy;
-    accel.angular.z = gz;
+    linear_acc.x = ax;
+    linear_acc.y = ay;
+    linear_acc.z = az;
+    angular_vel.x = gx;
+    angular_vel.y = gy;
+    angular_vel.z = gz;
     // bmi088.getAcceleration(&accel.linear.x, &accel.linear.y, &accel.linear.z);
     // bmi088.getGyroscope(&accel.angular.x, &accel.angular.y, &accel.angular.z);
+    acc_gyro.publish(&accel);
+}
+
+void publish_acc_gyro()
+{
+    accel.linear = linear_acc;
+    accel.angular = angular_vel;
     acc_gyro.publish(&accel);
 }
 
@@ -82,15 +104,15 @@ void init_mbed()
 {
     led3 = 0;
     led4 = 0;
-    publish_string("initialize mbed...");
+    // publish_string("initialize mbed...");
     while (1) 
     {
         if (bmi088.isConnection()) {
             bmi088.initialize();
-            publish_string("BMI088 is connected");
+            // publish_string("BMI088 is connected");
             break;
         } else {
-            publish_string("BMI088 is not connected");
+            // publish_string("BMI088 is not connected");
         }
         led3 = !led3;
         wait_ms(200);
@@ -111,7 +133,8 @@ void init_ros()
     nh.advertise(duties_pub);
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
-    publish_string("finish ros_init!!!");
+    nh.advertise(RPY_pub);
+    // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
 
@@ -121,15 +144,25 @@ int main()
     init_ros();
     init_mbed();
     led1 = 1;
-    publish_string("start loop!");
+    // publish_stri ng("start loop!");
+    // timer.attach(&update_pose, PERIOD);
     while(1)
     {
-        get_acc_gyro();
-        update_motor_rotation();
-        publish_string("loop!");
+        // get_acc_gyro();
+        // update_motor_rotation();
+        // publish_string("loop!");
+        // publish_acc_gyro();
+        update_pose();
+        RPY_pub.publish(&RPY_angle);
         nh.spinOnce();
-        wait_ms(10);
+        wait(PERIOD);
         led2 = !led2;
     }
     return 0;
+}
+
+void update_pose()
+{
+    get_acc_gyro();
+    RPY_angle = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
 }

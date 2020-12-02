@@ -7,7 +7,7 @@ using namespace std;
 #include <ros.h>
 #include <geometry_msgs/Vector3.h>
 
-Ekf::Ekf(float delta_t)
+Ekf::Ekf(double delta_t)
 {
   this->_delta_t = delta_t;
   this->_covariance_q << 1.74E-2*delta_t*delta_t, 0,
@@ -17,6 +17,7 @@ Ekf::Ekf(float delta_t)
   this->_covariance_p = this->_covariance_q;
   this->_angle << 0.0,
                   0.0;
+  this->_yaw = 0.0;
   this->_observation_matrix_H << 1.0, 0.0,
                                  0.0, 1.0;
 }
@@ -113,7 +114,9 @@ geometry_msgs::Vector3 Ekf::_get_corrected_angle(const Matrix<double, 2, 1>& pre
 {
   geometry_msgs::Vector3 output;
   this->_angle = predict_angle + kalman_gain * (actual_observation_angle - predict_angle);
+  this->_yaw = this->_yaw + this->_delta_t * this->_angular_vel(2);
   output.x = this->_angle(0);
   output.y = this->_angle(1);
+  output.z = this->_yaw;
   return output;
 }

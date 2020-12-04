@@ -18,8 +18,9 @@
 #define MOTOR_NUM 4
 #define PERIOD    0.01
 
-// declare functions
 void update_pose();
+void publish_acc_gyro();
+void rad_to_deg();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -44,8 +45,10 @@ geometry_msgs::Accel accel;
 ros::Publisher acc_gyro("acc_gyro", &accel);
 geometry_msgs::Vector3 linear_acc;
 geometry_msgs::Vector3 angular_vel;
-geometry_msgs::Vector3 RPY_angle;
-ros::Publisher RPY_pub("RPY_angle", &RPY_angle);
+geometry_msgs::Vector3 RPY_radian;
+ros::Publisher RPY_pub_rad("RPY_radian", &RPY_radian);
+geometry_msgs::Vector3 RPY_degree;
+ros::Publisher RPY_pub_deg("RPY_degree", &RPY_degree);
 // tf2::Quaternion quaternion;
 
 void publish_string(string message)
@@ -71,7 +74,6 @@ void get_acc_gyro()
     angular_vel.z = gz;
     // bmi088.getAcceleration(&accel.linear.x, &accel.linear.y, &accel.linear.z);
     // bmi088.getGyroscope(&accel.angular.x, &accel.angular.y, &accel.angular.z);
-    acc_gyro.publish(&accel);
 }
 
 void publish_acc_gyro()
@@ -133,7 +135,8 @@ void init_ros()
     nh.advertise(duties_pub);
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
-    nh.advertise(RPY_pub);
+    nh.advertise(RPY_pub_rad);
+    nh.advertise(RPY_pub_deg);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
@@ -145,15 +148,17 @@ int main()
     init_mbed();
     led1 = 1;
     // publish_stri ng("start loop!");
-    // timer.attach(&update_pose, PERIOD);
+    timer.attach(&update_pose, PERIOD);
     while(1)
     {
         // get_acc_gyro();
         // update_motor_rotation();
         // publish_string("loop!");
         // publish_acc_gyro();
-        update_pose();
-        RPY_pub.publish(&RPY_angle);
+        // update_pose();
+        RPY_pub_rad.publish(&RPY_radian);
+        RPY_pub_deg.publish(&RPY_degree);
+        publish_acc_gyro();
         nh.spinOnce();
         wait(PERIOD);
         led2 = !led2;
@@ -164,5 +169,13 @@ int main()
 void update_pose()
 {
     get_acc_gyro();
-    RPY_angle = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
+    RPY_radian = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
+    rad_to_deg();
+}
+
+void rad_to_deg()
+{
+    RPY_degree.x = (RPY_radian.x * 180) / 3.1415;
+    RPY_degree.y = (RPY_radian.y * 180) / 3.1415;
+    RPY_degree.z = (RPY_radian.z * 180) / 3.1415; 
 }

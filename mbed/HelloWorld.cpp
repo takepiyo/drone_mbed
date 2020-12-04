@@ -21,6 +21,7 @@
 void update_pose();
 void publish_acc_gyro();
 void rad_to_deg();
+void update_pose_without_kalman();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -45,6 +46,8 @@ geometry_msgs::Accel accel;
 ros::Publisher acc_gyro("acc_gyro", &accel);
 geometry_msgs::Vector3 linear_acc;
 geometry_msgs::Vector3 angular_vel;
+geometry_msgs::Vector3 RPY_raw;
+ros::Publisher RPY_pub_raw("RPY_raw", &RPY_raw);
 geometry_msgs::Vector3 RPY_radian;
 ros::Publisher RPY_pub_rad("RPY_radian", &RPY_radian);
 geometry_msgs::Vector3 RPY_degree;
@@ -99,7 +102,6 @@ void update_motor_rotation()
     // motor.update(duties.data);
     duties_pub.publish(&duties);
 }
-// ros::Subscriber<std_msgs::Float32MultiArray> duties_sub("input_duties", &update_duties);
 ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_duties);
 
 void init_mbed()
@@ -120,23 +122,21 @@ void init_mbed()
         wait_ms(200);
     }
     led3 = 1;    
-    // duties.data_length = MOTOR_NUM;
-    // duties.data = (float *)malloc(sizeof(float)*MOTOR_NUM);
-    // for(int i=0; i < MOTOR_NUM; i++)
-    // {
-    //     duties.data[i] = 0.0;
-    // }
-    duties.data = 0.0;
 }
 
 void init_ros()
 {
+    duties.data = 0.0;
+    RPY_raw.x = 0.0;
+    RPY_raw.y = 0.0;
+    RPY_raw.z = 0.0;
     nh.initNode();
     nh.advertise(duties_pub);
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
     nh.advertise(RPY_pub_rad);
     nh.advertise(RPY_pub_deg);
+    nh.advertise(RPY_pub_raw);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
@@ -158,6 +158,7 @@ int main()
         // update_pose();
         RPY_pub_rad.publish(&RPY_radian);
         RPY_pub_deg.publish(&RPY_degree);
+        RPY_pub_raw.publish(&RPY_raw);
         publish_acc_gyro();
         nh.spinOnce();
         wait(PERIOD);
@@ -169,6 +170,7 @@ int main()
 void update_pose()
 {
     get_acc_gyro();
+    update_pose_without_kalman();
     RPY_radian = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
     rad_to_deg();
 }
@@ -178,4 +180,11 @@ void rad_to_deg()
     RPY_degree.x = (RPY_radian.x * 180) / 3.1415;
     RPY_degree.y = (RPY_radian.y * 180) / 3.1415;
     RPY_degree.z = (RPY_radian.z * 180) / 3.1415; 
+}
+
+void update_pose_without_kalman()
+{
+    RPY_raw.x += (angular_vel.x * PERIOD * 180) / 3.1415;
+    RPY_raw.y += (angular_vel.y * PERIOD * 180) / 3.1415;
+    RPY_raw.z += (angular_vel.z * PERIOD * 180) / 3.1415;
 }

@@ -1,5 +1,4 @@
 #include "ExtendedKalmanFilter.h"
-
 #include "Eigen/Dense.h"
 using namespace Eigen;
 using namespace std;
@@ -65,7 +64,7 @@ Matrix<double, 2, 1> Ekf::_predict_angle()
   tri = _get_trigonometric(this->_angle);
   Matrix<double, 2, 3> A;
   A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
-       0.0, tri(1, 0)            , -1.0 * tri(0, 0); 
+       0.0, tri(1, 0)            , -1.0 * tri(0, 1); 
   Matrix<double, 2, 1> pred_angle;
   pred_angle = this->_angle + this->_delta_t * (A * this->_angular_vel);
   return pred_angle;
@@ -77,7 +76,7 @@ Matrix<double, 2, 2> Ekf::_get_state_jacobian()
   tri = _get_trigonometric(_angle);
   Matrix<double, 2, 2> state_jacobian_F;
   state_jacobian_F << 1 + this->_delta_t * (this->_angular_vel(1) * tri(1,0) * tri(2,1) - this->_angular_vel(2) * tri(0,0) * tri(2,1)), this->_delta_t * ((this->_angular_vel(1) * tri(0,0)) / pow(tri(1,1), 2) + (this->_angular_vel(2) * tri(1,0)) / pow(tri(1,1), 2)),
-                     -1 * this->_delta_t * (this->_angular_vel(1) * tri(0,0) + this->_angular_vel(2) * tri(1,0))                      , 1.0; 
+                     -1 * this->_delta_t * (this->_angular_vel(1))                                                                    , 1.0 + (-1) * this->_angular_vel(2) * tri(1,1); 
   return state_jacobian_F;
 }
 

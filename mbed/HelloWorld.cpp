@@ -22,6 +22,7 @@ void update_pose();
 void publish_acc_gyro();
 void rad_to_deg();
 void update_pose_without_kalman();
+void pose_from_acc();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -52,6 +53,8 @@ geometry_msgs::Vector3 RPY_radian;
 ros::Publisher RPY_pub_rad("RPY_radian", &RPY_radian);
 geometry_msgs::Vector3 RPY_degree;
 ros::Publisher RPY_pub_deg("RPY_degree", &RPY_degree);
+geometry_msgs::Vector3 RPY_acc;
+ros::Publisher RPY_pub_acc("RPY_acc", &RPY_acc);
 // tf2::Quaternion quaternion;
 
 void publish_string(string message)
@@ -130,6 +133,9 @@ void init_ros()
     RPY_raw.x = 0.0;
     RPY_raw.y = 0.0;
     RPY_raw.z = 0.0;
+    RPY_acc.x = 0.0;
+    RPY_acc.y = 0.0;
+    RPY_acc.z = 0.0;
     nh.initNode();
     nh.advertise(duties_pub);
     nh.advertise(debugger);
@@ -137,6 +143,7 @@ void init_ros()
     nh.advertise(RPY_pub_rad);
     nh.advertise(RPY_pub_deg);
     nh.advertise(RPY_pub_raw);
+    nh.advertise(RPY_pub_acc);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
@@ -159,6 +166,7 @@ int main()
         RPY_pub_rad.publish(&RPY_radian);
         RPY_pub_deg.publish(&RPY_degree);
         RPY_pub_raw.publish(&RPY_raw);
+        RPY_pub_acc.publish(&RPY_acc);
         publish_acc_gyro();
         nh.spinOnce();
         wait(PERIOD);
@@ -170,6 +178,7 @@ int main()
 void update_pose()
 {
     get_acc_gyro();
+    pose_from_acc();
     update_pose_without_kalman();
     RPY_radian = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
     rad_to_deg();
@@ -187,4 +196,11 @@ void update_pose_without_kalman()
     RPY_raw.x += (angular_vel.x * PERIOD * 180) / 3.1415;
     RPY_raw.y += (angular_vel.y * PERIOD * 180) / 3.1415;
     RPY_raw.z += (angular_vel.z * PERIOD * 180) / 3.1415;
+}
+
+void pose_from_acc()
+{
+    RPY_acc.x = (atan2(linear_acc.y, linear_acc.z) * 180) / 3.1415;
+    RPY_acc.y = (-1 * atan2(linear_acc.x, sqrt(pow(linear_acc.y, 2) + pow(linear_acc.z, 2))) * 180) / 3.1415;
+    RPY_acc.z += (angular_vel.z * PERIOD * 180) / 3.1415;
 }

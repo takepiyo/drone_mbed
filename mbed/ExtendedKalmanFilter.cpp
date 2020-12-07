@@ -14,7 +14,7 @@ Ekf::Ekf(double delta_t)
   this->_covariance_r << 1.00*delta_t*delta_t, 0,
                          0                      , 1.00*delta_t*delta_t;
   this->_covariance_p = this->_covariance_q;
-  this->_angle << 0.0,
+  this->_roll_pitch << 0.0,
                   0.0;
   this->_yaw = 0.0;
   this->_observation_matrix_H << 1.0, 0.0,
@@ -61,19 +61,22 @@ geometry_msgs::Vector3 Ekf::get_corrected(const geometry_msgs::Vector3& linear_a
 Matrix<double, 2, 1> Ekf::_predict_angle()
 {
   Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_angle);
+  tri = _get_trigonometric(this->_roll_pitch);
   Matrix<double, 2, 3> A;
   A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
        0.0, tri(1, 0)            , -1.0 * tri(0, 1); 
   Matrix<double, 2, 1> pred_angle;
-  pred_angle = this->_angle + this->_delta_t * (A * this->_angular_vel);
+  pred_angle = this->_roll_pitch + this->_delta_t * (A * this->_angular_vel);
+
+  // predict yaw angle here to minimize tri calcurate
+  this->_yaw += this->_delta_t * ((this->_angular_vel(1) * tri(0, 0)) / tri(1, 1) + (this->_angular_vel(2) * tri(1, 0)) / tri(1, 1));
   return pred_angle;
 }
 
 Matrix<double, 2, 2> Ekf::_get_state_jacobian()
 {
   Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(_angle);
+  tri = _get_trigonometric(this->_roll_pitch);
   Matrix<double, 2, 2> state_jacobian_F;
   state_jacobian_F << 1 + this->_delta_t * (this->_angular_vel(1) * tri(1,0) * tri(2,1) - this->_angular_vel(2) * tri(0,0) * tri(2,1)), this->_delta_t * ((this->_angular_vel(1) * tri(0,0)) / pow(tri(1,1), 2) + (this->_angular_vel(2) * tri(1,0)) / pow(tri(1,1), 2)),
                      -1 * this->_delta_t * (this->_angular_vel(1))                                                                    , 1.0 + (-1) * this->_angular_vel(2) * tri(1,1); 
@@ -112,10 +115,9 @@ geometry_msgs::Vector3 Ekf::_get_corrected_angle(const Matrix<double, 2, 1>& pre
                                                  const Matrix<double, 2, 2>& kalman_gain)
 {
   geometry_msgs::Vector3 output;
-  this->_angle = predict_angle + kalman_gain * (actual_observation_angle - predict_angle);
-  this->_yaw = this->_yaw + this->_delta_t * this->_angular_vel(2);
-  output.x = this->_angle(0);
-  output.y = this->_angle(1);
+  this->_roll_pitch = predict_angle + kalman_gain * (actual_observation_angle - predict_angle);
+  output.x = this->_roll_pitch(0);
+  output.y = this->_roll_pitch(1);
   output.z = this->_yaw;
   return output;
 }

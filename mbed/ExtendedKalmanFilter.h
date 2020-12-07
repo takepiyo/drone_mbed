@@ -29,7 +29,7 @@ class Ekf
   Matrix<double, 2, 2> _observation_matrix_H;
 
  // to retain angle for next step
-  Matrix<double, 2, 1> _angle;
+  Matrix<double, 2, 1> _roll_pitch;
 
   Matrix<double, 3, 2> _get_trigonometric(const Matrix<double, 2, 1>& angle);
  

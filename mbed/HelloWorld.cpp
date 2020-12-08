@@ -20,7 +20,7 @@
 
 void update_pose();
 void publish_acc_gyro();
-void rad_to_deg();
+void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree);
 void update_pose_without_kalman();
 void pose_from_acc();
 
@@ -43,19 +43,21 @@ std_msgs::Float32 duties;
 ros::Publisher duties_pub("now_duty", &duties);
 std_msgs::String echo;
 ros::Publisher debugger("debug_message", &echo); 
+
 geometry_msgs::Accel accel;
 ros::Publisher acc_gyro("acc_gyro", &accel);
 geometry_msgs::Vector3 linear_acc;
 geometry_msgs::Vector3 angular_vel;
+
 geometry_msgs::Vector3 RPY_raw;
-ros::Publisher RPY_pub_raw("RPY_raw", &RPY_raw);
-geometry_msgs::Vector3 RPY_radian;
-ros::Publisher RPY_pub_rad("RPY_radian", &RPY_radian);
-geometry_msgs::Vector3 RPY_degree;
-ros::Publisher RPY_pub_deg("RPY_degree", &RPY_degree);
+geometry_msgs::Vector3 RPY_raw_deg;
+ros::Publisher RPY_pub_raw("RPY_raw", &RPY_raw_deg);
+
+geometry_msgs::Vector3 RPY_kalman;
+ros::Publisher RPY_pub_kalman("RPY_kalman", &RPY_kalman);
+
 geometry_msgs::Vector3 RPY_acc;
 ros::Publisher RPY_pub_acc("RPY_acc", &RPY_acc);
-// tf2::Quaternion quaternion;
 
 void publish_string(string message)
 {
@@ -140,8 +142,7 @@ void init_ros()
     nh.advertise(duties_pub);
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
-    nh.advertise(RPY_pub_rad);
-    nh.advertise(RPY_pub_deg);
+    nh.advertise(RPY_pub_kalman);
     nh.advertise(RPY_pub_raw);
     nh.advertise(RPY_pub_acc);
     // publish_string("finish ros_init!!!");
@@ -163,9 +164,8 @@ int main()
         // publish_string("loop!");
         // publish_acc_gyro();
         // update_pose();
-        RPY_pub_rad.publish(&RPY_radian);
-        RPY_pub_deg.publish(&RPY_degree);
-        RPY_pub_raw.publish(&RPY_raw);
+        RPY_pub_kalman.publish(&RPY_kalman);
+        RPY_pub_raw.publish(&RPY_raw_deg);
         RPY_pub_acc.publish(&RPY_acc);
         publish_acc_gyro();
         nh.spinOnce();
@@ -179,28 +179,29 @@ void update_pose()
 {
     get_acc_gyro();
     pose_from_acc();
+    RPY_kalman = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
+    rad_to_deg(RPY_kalman, RPY_kalman);
     update_pose_without_kalman();
-    RPY_radian = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
-    rad_to_deg();
+    rad_to_deg(RPY_raw, RPY_raw_deg);
 }
 
-void rad_to_deg()
+void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree)
 {
-    RPY_degree.x = (RPY_radian.x * 180) / 3.1415;
-    RPY_degree.y = (RPY_radian.y * 180) / 3.1415;
-    RPY_degree.z = (RPY_radian.z * 180) / 3.1415; 
+    degree.x = (radian.x * 180) / 3.1415;
+    degree.y = (radian.y * 180) / 3.1415;
+    degree.z = (radian.z * 180) / 3.1415; 
 }
 
 void update_pose_without_kalman()
 {
-    RPY_raw.x += (angular_vel.x * PERIOD * 180) / 3.1415;
-    RPY_raw.y += (angular_vel.y * PERIOD * 180) / 3.1415;
-    RPY_raw.z += (angular_vel.z * PERIOD * 180) / 3.1415;
+    RPY_raw.x += PERIOD * (angular_vel.x + std::sin(RPY_raw.x) * std::tan(RPY_raw.y) * angular_vel.y + std::cos(RPY_raw.x) * std::tan(RPY_raw.y) * angular_vel.z);
+    RPY_raw.y += PERIOD * (std::cos(RPY_raw.x) * angular_vel.y - std::sin(RPY_raw.x) * angular_vel.z);
+    RPY_raw.z += PERIOD * ((std::sin(RPY_raw.x) * angular_vel.y) / (std::cos(RPY_raw.y)) + (std::cos(RPY_raw.x) * angular_vel.z)/(std::cos(RPY_raw.y)));
 }
 
 void pose_from_acc()
 {
     RPY_acc.x = (atan2(linear_acc.y, linear_acc.z) * 180) / 3.1415;
     RPY_acc.y = (-1 * atan2(linear_acc.x, sqrt(pow(linear_acc.y, 2) + pow(linear_acc.z, 2))) * 180) / 3.1415;
-    RPY_acc.z += (angular_vel.z * PERIOD * 180) / 3.1415;
+    RPY_acc.z = 4545.0;
 }

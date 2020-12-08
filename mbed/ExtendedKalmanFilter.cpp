@@ -96,7 +96,8 @@ Matrix<double, 5, 1> Ekf::_predict_angle()
                           angular_bais(2); 
 
   // predict yaw angle here to minimize tri calcurate
-  this->_yaw += this->_delta_t * ((this->_angular_vel(1) * tri(0, 0)) / tri(1, 1) + ((this->_angular_vel(2) - angular_bais(2)) * tri(1, 0)) / tri(1, 1));
+  // this->_yaw += this->_delta_t * (((this->_angular_vel(1) - angular_bais(1)) * tri(0, 0)) / (tri(1, 1)) + ((this->_angular_vel(2) - angular_bais(2)) * tri(1, 0)) / tri(1, 1));
+  this->_yaw += this->_delta_t * ((this->_angular_vel(1) * tri(0, 0)) / (tri(1, 1)) + (this->_angular_vel(2) * tri(1, 0)) / tri(1, 1));
   return pred_roll_pitch_bais;
 }
 

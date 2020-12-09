@@ -56,8 +56,11 @@ geometry_msgs::Vector3 RPY_raw;
 geometry_msgs::Vector3 RPY_raw_deg;
 ros::Publisher RPY_pub_raw("RPY_raw", &RPY_raw_deg);
 
-geometry_msgs::Vector3 RPY_kalman;
-ros::Publisher RPY_pub_kalman("RPY_kalman", &RPY_kalman);
+geometry_msgs::Vector3 RPY_kalman_deg;
+ros::Publisher RPY_pub_kalman_deg("RPY_kalman_deg", &RPY_kalman_deg);
+
+geometry_msgs::Vector3 RPY_kalman_rad;
+ros::Publisher RPY_pub_kalman_rad("RPY_kalman_rad", &RPY_kalman_rad);
 
 geometry_msgs::Vector3 kalman_bias;
 ros::Publisher kalman_bias_pub("kalman_bias", &kalman_bias);
@@ -123,9 +126,6 @@ void init_mbed()
     {
         if (bmi088.isConnection()) {
             bmi088.initialize();
-            // RPY_raw_deg.x = bmi088.acc_bias_x;
-            // RPY_raw_deg.y = bmi088.acc_bias_y;
-            // RPY_raw_deg.z = bmi088.acc_bias_z;
             break;
         }
         led3 = !led3;
@@ -147,7 +147,8 @@ void init_ros()
     nh.advertise(duties_pub);
     nh.advertise(debugger);
     nh.advertise(acc_gyro);
-    nh.advertise(RPY_pub_kalman);
+    nh.advertise(RPY_pub_kalman_deg);
+    nh.advertise(RPY_pub_kalman_rad);
     nh.advertise(RPY_pub_raw);
     nh.advertise(RPY_pub_acc);
     nh.advertise(kalman_bias_pub);
@@ -172,7 +173,8 @@ int main()
         // publish_string("loop!");
         // publish_acc_gyro();
         // update_pose();
-        RPY_pub_kalman.publish(&RPY_kalman);
+        RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
+        RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
         RPY_pub_raw.publish(&RPY_raw_deg);
         RPY_pub_acc.publish(&RPY_acc);
         kalman_bias_pub.publish(&kalman_bias);
@@ -180,7 +182,7 @@ int main()
         publish_acc_gyro();
         nh.spinOnce();
         __enable_irq(); // 許可
-        wait(PERIOD * 10);
+        wait(PERIOD);
         led2 = !led2;
     }
     return 0;
@@ -190,10 +192,10 @@ void update_pose()
 {
     get_acc_gyro();
     pose_from_acc();
-    RPY_kalman = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
+    RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
     kalman_bias = ex_kalman_filter.get_bais();
     bias_gyro();
-    rad_to_deg(RPY_kalman, RPY_kalman);
+    rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
     // update_pose_without_kalman();
     // rad_to_deg(RPY_raw, RPY_raw_deg);
 }

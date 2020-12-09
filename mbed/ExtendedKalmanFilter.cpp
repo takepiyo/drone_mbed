@@ -57,6 +57,15 @@ geometry_msgs::Vector3 Ekf::get_corrected(const geometry_msgs::Vector3& linear_a
   return _get_corrected_angle(pre_roll_pitch_bais, actual_observation_angle, kalman_gain);
 }
 
+geometry_msgs::Vector3 Ekf::get_bais()
+{
+  geometry_msgs::Vector3 bias;
+  bias.x = this->_roll_pitch_bias(2);
+  bias.y = this->_roll_pitch_bias(3);
+  bias.z = this->_roll_pitch_bias(4);
+  return bias;
+}
+
  Matrix<double, 3, 2> Ekf::_get_trigonometric(const Matrix<double, 5, 1>&  roll_pitch_bais)
 {
   Matrix<double, 3, 2> trigonometric;

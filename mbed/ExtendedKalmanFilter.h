@@ -12,6 +12,7 @@ class Ekf
   ~Ekf();
   geometry_msgs::Vector3 get_corrected(const geometry_msgs::Vector3& linear_acc,
                                        const geometry_msgs::Vector3& angular_vel);
+  geometry_msgs::Vector3 get_bais();
   private:
   double _delta_t;
   double _yaw;

@@ -96,6 +96,9 @@
 
 #define BMI088_GYRO_SELF_TEST 0x3C
 
+#define CALIBRATION_COUNT 30
+// #define CUT_OFF_FREQUENCY 500 // [Hz]
+
 enum device_type_t
 {              // device type
   ACC = 0x00,  //
@@ -159,7 +162,7 @@ enum gyro_power_type_t
 class BMI088
 {
 public:
-  BMI088(PinName sda, PinName scl);
+  BMI088(PinName sda, PinName scl, float period);
 
   bool isConnection(void);
 
@@ -201,10 +204,22 @@ private:
   //    void read(device_type_t dev, uint8_t reg, uint8_t* buf, uint16_t len);
   void read(device_type_t dev, char reg, char *buf, uint16_t len);
 
+  void calibrationAcc(void);
+
   float accRange;
   float gyroRange;
   uint8_t devAddrAcc;
   uint8_t devAddrGyro;
+
+  float acc_bias_x;
+  float acc_bias_y;
+  float acc_bias_z;
+  float period;
+
+  // float tau;
+  // float pre_acc_x;
+  // float pre_acc_y;
+  // float pre_acc_z;
 
 protected:
   I2C i2c;

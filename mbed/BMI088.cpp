@@ -29,11 +29,20 @@
 
 #include "BMI088.h"
 
-BMI088::BMI088(PinName sda, PinName scl) : i2c(sda, scl)
+BMI088::BMI088(PinName sda, PinName scl, float period) : i2c(sda, scl)
 {
   devAddrAcc = BMI088_ACC_ADDRESS;
   devAddrGyro = BMI088_GYRO_ADDRESS;
   i2c.frequency(100000);
+
+  acc_bias_x = 0.0;
+  acc_bias_y = 0.0;
+  acc_bias_z = 0.0;
+  this->period = period;
+  // pre_acc_x = 0.0;
+  // pre_acc_y = 0.0;
+  // pre_acc_z = 9.79f;
+  // tau = 1.0f / (2 * 3.141592f * CUT_OFF_FREQUENCY);
 }
 
 void BMI088::initialize(void)
@@ -45,6 +54,8 @@ void BMI088::initialize(void)
   setGyroScaleRange(RANGE_2000);
   setGyroOutputDataRate(ODR_2000_BW_532);
   setGyroPoweMode(GYRO_NORMAL);
+
+  calibrationAcc();
 }
 
 bool BMI088::isConnection(void)
@@ -183,13 +194,18 @@ void BMI088::getAcceleration(float *x, float *y, float *z)
   az = buf[4] | (buf[5] << 8);
 
   value = (int16_t)ax;
-  *x = accRange * value / 32768000 * 9.81f; // units: m/s^2
+  *x = accRange * value / 32768000 * 9.79f - acc_bias_x; // units: m/s^2
 
   value = (int16_t)ay;
-  *y = accRange * value / 32768000 * 9.81f; // units: m/s^2
+  *y = accRange * value / 32768000 * 9.79f - acc_bias_y; // units: m/s^2
 
   value = (int16_t)az;
-  *z = accRange * value / 32768000 * 9.81f; // units: m/s^2
+  *z = accRange * value / 32768000 * 9.79f - acc_bias_z; // units: m/s^2
+
+  // low pass filter
+  // *x = (tau * pre_acc_x) / (tau + period) + (period * *x) / (tau + period);
+  // *y = (tau * pre_acc_y) / (tau + period) + (period * *y) / (tau + period);
+  // *z = (tau * pre_acc_z) / (tau + period) + (period * *z) / (tau + period);
 }
 
 float BMI088::getAccelerationX(void)
@@ -200,7 +216,7 @@ float BMI088::getAccelerationX(void)
   ax = read16(ACC, BMI088_ACC_X_LSB);
 
   value = (int16_t)ax;
-  value = accRange * value / 32768000 * 9.81f; // units: m/s^2
+  value = accRange * value / 32768000 * 9.79f; // units: m/s^2
 
   return value;
 }
@@ -213,7 +229,7 @@ float BMI088::getAccelerationY(void)
   ay = read16(ACC, BMI088_ACC_Y_LSB);
 
   value = (int16_t)ay;
-  value = accRange * value / 32768000 * 9.81f; // units: m/s^2
+  value = accRange * value / 32768000 * 9.79f; // units: m/s^2
 
   return value;
 }
@@ -226,7 +242,7 @@ float BMI088::getAccelerationZ(void)
   az = read16(ACC, BMI088_ACC_Z_LSB);
 
   value = (int16_t)az;
-  value = accRange * value / 32768000 * 9.81f; // units: m/s^2
+  value = accRange * value / 32768000 * 9.79f; // units: m/s^2
 
   return value;
 }
@@ -325,10 +341,6 @@ void BMI088::write8(device_type_t dev, char reg, uint8_t val)
   }
 
   i2c.write(addr, cmd, 2);
-  // Wire.beginTransmission(addr);
-  // Wire.write(reg);
-  // Wire.write(val);
-  // Wire.endTransmission();
 }
 
 uint8_t BMI088::read8(device_type_t dev, char reg)
@@ -345,16 +357,8 @@ uint8_t BMI088::read8(device_type_t dev, char reg)
     addr = devAddrAcc;
   }
 
-  // Wire.beginTransmission(addr);
-  // Wire.write(reg);
-  // Wire.endTransmission();
   i2c.write(addr, &reg, 1);
   i2c.read(addr, &data, 1);
-
-  // Wire.requestFrom(addr, 1);
-  // while (Wire.available()) {
-  //     data = Wire.read();
-  // }
 
   return data;
 }
@@ -377,17 +381,6 @@ uint16_t BMI088::read16(device_type_t dev, char reg)
   i2c.write(addr, &reg, 1);
   i2c.read(addr, data, 2);
 
-  // Wire.beginTransmission(addr);
-  // Wire.write(reg);
-  // Wire.endTransmission();
-
-  // Wire.requestFrom(addr, 2);
-  // while (Wire.available()) {
-  //     lsb = Wire.read();
-  //     msb = Wire.read();
-  // }
-
-  // return (lsb | (msb << 8));
   return (data[0] | (data[1] << 8));
 }
 
@@ -410,24 +403,12 @@ uint16_t BMI088::read16Be(device_type_t dev, char reg)
   i2c.write(addr, &reg, 1);
   i2c.read(addr, data, 2);
 
-  // Wire.beginTransmission(addr);
-  // Wire.write(reg);
-  // Wire.endTransmission();
-
-  // Wire.requestFrom(addr, 2);
-  // while (Wire.available()) {
-  //     msb = Wire.read();
-  //     lsb = Wire.read();
-  // }
-
-  // return (lsb | (msb << 8));
   return (data[0] | (data[1] << 8));
 }
 
 uint32_t BMI088::read24(device_type_t dev, char reg)
 {
   int addr = 0;
-  // uint32_t hsb = 0, msb = 0, lsb = 0;
   char data[3];
 
   if (dev)
@@ -441,17 +422,6 @@ uint32_t BMI088::read24(device_type_t dev, char reg)
 
   i2c.write(addr, &reg, 1);
   i2c.read(addr, data, 3);
-
-  // Wire.beginTransmission(addr);
-  // Wire.write(reg);
-  // Wire.endTransmission();
-
-  // Wire.requestFrom(addr, 3);
-  // while (Wire.available()) {
-  //     lsb = Wire.read();
-  //     msb = Wire.read();
-  //     hsb = Wire.read();
-  // }
 
   return (data[0] | (data[1] << 8) | (data[2] << 16));
 }
@@ -470,14 +440,17 @@ void BMI088::read(device_type_t dev, char reg, char *buf, uint16_t len)
 
   i2c.write(addr, &reg, 1);
   i2c.read(addr, buf, len);
+}
 
-  // Wire.beginTransmission(addr);
-  // Wire.write(reg);
-  // Wire.endTransmission();
-
-  // Wire.requestFrom(addr, len);
-  //    for (uint16_t i = 0; i < len; i ++) {
-  //        // buf[i] = Wire.read();
-  //        buf + i = i2c.read();
-  //    }
+void BMI088::calibrationAcc(void)
+{
+  for(int i = 0; i < CALIBRATION_COUNT; i++)
+  {
+    float ax = 0, ay = 0, az = 0;
+    getAcceleration(&ax, &ay, &az);
+    acc_bias_x += ax / CALIBRATION_COUNT;
+    acc_bias_y += (ay + 0.11f) / CALIBRATION_COUNT;
+    acc_bias_z += (az - 9.79f) / CALIBRATION_COUNT;
+    wait(period * 10);
+  }
 }

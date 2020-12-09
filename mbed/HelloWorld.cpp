@@ -18,11 +18,14 @@
 #define MOTOR_NUM 4
 #define PERIOD    0.01
 
+void calibration_acc();
+
 void update_pose();
 void publish_acc_gyro();
 void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree);
 void update_pose_without_kalman();
 void pose_from_acc();
+void bias_gyro();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -31,7 +34,7 @@ DigitalOut led3 = LED3;
 DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
-BMI088 bmi088(p9, p10);
+BMI088 bmi088(p9, p10, PERIOD);
 Ekf    ex_kalman_filter(PERIOD);
 
 Ticker timer;
@@ -55,6 +58,12 @@ ros::Publisher RPY_pub_raw("RPY_raw", &RPY_raw_deg);
 
 geometry_msgs::Vector3 RPY_kalman;
 ros::Publisher RPY_pub_kalman("RPY_kalman", &RPY_kalman);
+
+geometry_msgs::Vector3 kalman_bias;
+ros::Publisher kalman_bias_pub("kalman_bias", &kalman_bias);
+
+geometry_msgs::Vector3 biased_gyro;
+ros::Publisher biased_gyro_pub("biased_gyro", &biased_gyro);
 
 geometry_msgs::Vector3 RPY_acc;
 ros::Publisher RPY_pub_acc("RPY_acc", &RPY_acc);
@@ -80,8 +89,6 @@ void get_acc_gyro()
     angular_vel.x = gx;
     angular_vel.y = gy;
     angular_vel.z = gz;
-    // bmi088.getAcceleration(&accel.linear.x, &accel.linear.y, &accel.linear.z);
-    // bmi088.getGyroscope(&accel.angular.x, &accel.angular.y, &accel.angular.z);
 }
 
 void publish_acc_gyro()
@@ -91,7 +98,6 @@ void publish_acc_gyro()
     acc_gyro.publish(&accel);
 }
 
-// void update_duties(const std_msgs::Float32MultiArray& input_duties)
 void update_duties(const std_msgs::Float32& input_duties)
 {
     duties = input_duties;
@@ -113,15 +119,14 @@ void init_mbed()
 {
     led3 = 0;
     led4 = 0;
-    // publish_string("initialize mbed...");
     while (1) 
     {
         if (bmi088.isConnection()) {
             bmi088.initialize();
-            // publish_string("BMI088 is connected");
+            // RPY_raw_deg.x = bmi088.acc_bias_x;
+            // RPY_raw_deg.y = bmi088.acc_bias_y;
+            // RPY_raw_deg.z = bmi088.acc_bias_z;
             break;
-        } else {
-            // publish_string("BMI088 is not connected");
         }
         led3 = !led3;
         wait_ms(200);
@@ -145,6 +150,8 @@ void init_ros()
     nh.advertise(RPY_pub_kalman);
     nh.advertise(RPY_pub_raw);
     nh.advertise(RPY_pub_acc);
+    nh.advertise(kalman_bias_pub);
+    nh.advertise(biased_gyro_pub);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
@@ -159,6 +166,7 @@ int main()
     timer.attach(&update_pose, PERIOD);
     while(1)
     {
+        __disable_irq(); // 禁止
         // get_acc_gyro();
         // update_motor_rotation();
         // publish_string("loop!");
@@ -167,9 +175,12 @@ int main()
         RPY_pub_kalman.publish(&RPY_kalman);
         RPY_pub_raw.publish(&RPY_raw_deg);
         RPY_pub_acc.publish(&RPY_acc);
+        kalman_bias_pub.publish(&kalman_bias);
+        biased_gyro_pub.publish(&biased_gyro);
         publish_acc_gyro();
         nh.spinOnce();
-        wait(PERIOD);
+        __enable_irq(); // 許可
+        wait(PERIOD * 10);
         led2 = !led2;
     }
     return 0;
@@ -180,9 +191,11 @@ void update_pose()
     get_acc_gyro();
     pose_from_acc();
     RPY_kalman = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
+    kalman_bias = ex_kalman_filter.get_bais();
+    bias_gyro();
     rad_to_deg(RPY_kalman, RPY_kalman);
-    update_pose_without_kalman();
-    rad_to_deg(RPY_raw, RPY_raw_deg);
+    // update_pose_without_kalman();
+    // rad_to_deg(RPY_raw, RPY_raw_deg);
 }
 
 void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree)
@@ -204,4 +217,11 @@ void pose_from_acc()
     RPY_acc.x = (atan2(linear_acc.y, linear_acc.z) * 180) / 3.1415;
     RPY_acc.y = (-1 * atan2(linear_acc.x, sqrt(pow(linear_acc.y, 2) + pow(linear_acc.z, 2))) * 180) / 3.1415;
     RPY_acc.z = 4545.0;
+}
+
+void bias_gyro()
+{
+    biased_gyro.x = angular_vel.x - kalman_bias.x;
+    biased_gyro.y = angular_vel.y - kalman_bias.y;
+    biased_gyro.z = angular_vel.z - kalman_bias.z;
 }

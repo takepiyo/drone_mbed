@@ -3,6 +3,7 @@ using namespace Eigen;
 
 #include <ros.h>
 #include <geometry_msgs/Vector3.h>
+#include <geometry_msgs/Transform.h>
 
 class Ekf 
 {
@@ -13,6 +14,8 @@ class Ekf
   geometry_msgs::Vector3 get_corrected(const geometry_msgs::Vector3& linear_acc,
                                        const geometry_msgs::Vector3& angular_vel);
   geometry_msgs::Vector3 get_bais();
+  geometry_msgs::Transform get_predicted_value_no_filter();
+
   private:
   double _delta_t;
   double _yaw;
@@ -31,6 +34,10 @@ class Ekf
 
  // to retain angle for next step
   Matrix<double, 5, 1> _roll_pitch_bias;
+
+  // to measure variance, no filtered angle
+  Matrix<double, 5, 1> _roll_pitch_bias_no_filter;
+  Matrix<double, 2, 1> _acc_angle_no_filter;
 
   Matrix<double, 3, 2> _get_trigonometric(const Matrix<double, 5, 1>& roll_pitch_bais);
  

@@ -5,6 +5,7 @@ using namespace std;
 
 #include <ros.h>
 #include <geometry_msgs/Vector3.h>
+#include <geometry_msgs/Transform.h>
 
 Ekf::Ekf(double delta_t)
 {
@@ -64,6 +65,46 @@ geometry_msgs::Vector3 Ekf::get_bais()
   bias.y = this->_roll_pitch_bias(3);
   bias.z = this->_roll_pitch_bias(4);
   return bias;
+}
+
+geometry_msgs::Transform Ekf::get_predicted_value_no_filter()
+{
+  Matrix<double, 3, 2> tri;
+  tri = _get_trigonometric(this->_roll_pitch_bias_no_filter);
+
+  Matrix<double, 2, 1> roll_pitch;
+  roll_pitch << _roll_pitch_bias_no_filter(0),
+                _roll_pitch_bias_no_filter(1);
+
+  Matrix<double, 3, 1> angular_bais;
+  angular_bais << _roll_pitch_bias_no_filter(2),
+                  _roll_pitch_bias_no_filter(3),
+                  _roll_pitch_bias_no_filter(4);
+                  
+  Matrix<double, 2, 3> A;
+  A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
+       0.0, tri(1, 0)            ,      -1.0 * tri(0, 1); 
+  Matrix<double, 2, 1> pred_angle;
+  pred_angle = roll_pitch + this->_delta_t * (A * (this->_angular_vel));
+
+  _roll_pitch_bias_no_filter(0) = pred_angle(0);
+  _roll_pitch_bias_no_filter(1) = pred_angle(1);
+
+  Matrix<double, 2, 1> observation_angle;
+  observation_angle << atan2(this->_linear_acc(1), this->_linear_acc(2)), 
+                       -1 * atan2(this->_linear_acc(0), hypot(this->_linear_acc(1), this->_linear_acc(2)));
+  _acc_angle_no_filter(0) = observation_angle(0);
+  _acc_angle_no_filter(1) = observation_angle(1);
+
+  geometry_msgs::Transform output;
+  output.translation.x = _roll_pitch_bias_no_filter(2);
+  output.translation.y = _roll_pitch_bias_no_filter(3);
+  output.translation.z = _roll_pitch_bias_no_filter(4);
+  output.rotation.w = _roll_pitch_bias_no_filter(0);
+  output.rotation.x = _roll_pitch_bias_no_filter(1);
+  output.rotation.y = _acc_angle_no_filter(0);
+  output.rotation.z = _acc_angle_no_filter(1);
+  return output;
 }
 
  Matrix<double, 3, 2> Ekf::_get_trigonometric(const Matrix<double, 5, 1>&  roll_pitch_bais)

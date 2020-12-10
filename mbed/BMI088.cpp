@@ -444,13 +444,17 @@ void BMI088::read(device_type_t dev, char reg, char *buf, uint16_t len)
 
 void BMI088::calibrationAcc(void)
 {
+  float x_ave = 0.0, y_ave = 0.0, z_ave = 0.0;
   for(int i = 0; i < CALIBRATION_COUNT; i++)
   {
     float ax = 0, ay = 0, az = 0;
     getAcceleration(&ax, &ay, &az);
-    acc_bias_x += ax / CALIBRATION_COUNT;
-    acc_bias_y += (ay + 0.11f) / CALIBRATION_COUNT;
-    acc_bias_z += (az - 9.79f) / CALIBRATION_COUNT;
+    x_ave += ax / CALIBRATION_COUNT;
+    y_ave += ay / CALIBRATION_COUNT;
+    z_ave += (az - 9.79f) / CALIBRATION_COUNT;
     wait(period * 10);
   }
+  acc_bias_x = x_ave;
+  acc_bias_y = y_ave;
+  acc_bias_z = z_ave;
 }

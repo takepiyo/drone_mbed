@@ -25,7 +25,6 @@ void publish_acc_gyro();
 void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree);
 void update_pose_without_kalman();
 void pose_from_acc();
-void bias_gyro();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -61,9 +60,6 @@ ros::Publisher RPY_pub_kalman_deg("RPY_kalman_deg", &RPY_kalman_deg);
 
 geometry_msgs::Vector3 RPY_kalman_rad;
 ros::Publisher RPY_pub_kalman_rad("RPY_kalman_rad", &RPY_kalman_rad);
-
-geometry_msgs::Vector3 kalman_bias;
-ros::Publisher kalman_bias_pub("kalman_bias", &kalman_bias);
 
 geometry_msgs::Vector3 biased_gyro;
 ros::Publisher biased_gyro_pub("biased_gyro", &biased_gyro);
@@ -154,7 +150,6 @@ void init_ros()
     nh.advertise(RPY_pub_kalman_rad);
     // nh.advertise(RPY_pub_raw);
     // nh.advertise(RPY_pub_acc);
-    nh.advertise(kalman_bias_pub);
     nh.advertise(biased_gyro_pub);
     // nh.advertise(no_filter_pub);
     // publish_string("finish ros_init!!!");
@@ -180,7 +175,6 @@ int main()
         RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
         // RPY_pub_raw.publish(&RPY_raw_deg);
         // RPY_pub_acc.publish(&RPY_acc);
-        kalman_bias_pub.publish(&kalman_bias);
         biased_gyro_pub.publish(&biased_gyro);
         // no_filter_pub.publish(&no_filter_pred);
         // publish_acc_gyro();
@@ -197,9 +191,7 @@ void update_pose()
     get_acc_gyro();
     // pose_from_acc();
     RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
-    kalman_bias = ex_kalman_filter.get_bais();
     no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
-    bias_gyro();
     rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
     // update_pose_without_kalman();
     // rad_to_deg(RPY_raw, RPY_raw_deg);
@@ -224,11 +216,4 @@ void pose_from_acc()
     RPY_acc.x = (atan2(linear_acc.y, linear_acc.z) * 180) / 3.1415;
     RPY_acc.y = (-1 * atan2(linear_acc.x, sqrt(pow(linear_acc.y, 2) + pow(linear_acc.z, 2))) * 180) / 3.1415;
     RPY_acc.z = 4545.0;
-}
-
-void bias_gyro()
-{
-    biased_gyro.x = angular_vel.x - kalman_bias.x;
-    biased_gyro.y = angular_vel.y - kalman_bias.y;
-    biased_gyro.z = angular_vel.z - kalman_bias.z;
 }

@@ -147,16 +147,16 @@ void init_ros()
     RPY_acc.y = 0.0;
     RPY_acc.z = 0.0;
     nh.initNode();
-    nh.advertise(duties_pub);
-    nh.advertise(debugger);
-    nh.advertise(acc_gyro);
+    // nh.advertise(duties_pub);
+    // nh.advertise(debugger);
+    // nh.advertise(acc_gyro);
     nh.advertise(RPY_pub_kalman_deg);
     nh.advertise(RPY_pub_kalman_rad);
-    nh.advertise(RPY_pub_raw);
-    nh.advertise(RPY_pub_acc);
+    // nh.advertise(RPY_pub_raw);
+    // nh.advertise(RPY_pub_acc);
     nh.advertise(kalman_bias_pub);
     nh.advertise(biased_gyro_pub);
-    nh.advertise(no_filter_pub);
+    // nh.advertise(no_filter_pub);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
@@ -176,14 +176,14 @@ int main()
         // update_motor_rotation();
         // publish_string("loop!");
         // update_pose();
-        // RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
-        // RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
+        RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
+        RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
         // RPY_pub_raw.publish(&RPY_raw_deg);
         // RPY_pub_acc.publish(&RPY_acc);
-        // kalman_bias_pub.publish(&kalman_bias);
-        // biased_gyro_pub.publish(&biased_gyro);
-        no_filter_pub.publish(&no_filter_pred);
-        publish_acc_gyro();
+        kalman_bias_pub.publish(&kalman_bias);
+        biased_gyro_pub.publish(&biased_gyro);
+        // no_filter_pub.publish(&no_filter_pred);
+        // publish_acc_gyro();
         nh.spinOnce();
         __enable_irq(); // 許可
         wait(PERIOD);
@@ -195,9 +195,9 @@ int main()
 void update_pose()
 {
     get_acc_gyro();
-    pose_from_acc();
+    // pose_from_acc();
     RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
-    // kalman_bias = ex_kalman_filter.get_bais();
+    kalman_bias = ex_kalman_filter.get_bais();
     no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
     bias_gyro();
     rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);

@@ -10,16 +10,22 @@ using namespace std;
 Ekf::Ekf(double delta_t)
 {
   this->_delta_t = delta_t;
-  this->_covariance_q << 1.74E-2*delta_t*delta_t, 0,                        0,                       0,                       0, 
-                         0,                       1.74E-2*delta_t*delta_t,  0,                       0,                       0,
-                         0,                       0,                        1.74E-2*delta_t*delta_t, 0,                       0,
-                         0,                       0,                        0,                       1.74E-2*delta_t*delta_t, 0, 
-                         0,                       0,                        0,                       0,                       1.74E-2*delta_t*delta_t;
-
-  this->_covariance_r << 1.0*delta_t*delta_t, 0                  ,                    
-                         0                  , 1.0*delta_t*delta_t;
-
+  // this->_covariance_q << 1.74E-2*delta_t*delta_t, 0,                        0,                       0,                       0, 
+  //                        0,                       1.74E-2*delta_t*delta_t,  0,                       0,                       0,
+  //                        0,                       0,                        1.74E-2*delta_t*delta_t, 0,                       0,
+  //                        0,                       0,                        0,                       1.74E-2*delta_t*delta_t, 0, 
+  //                        0,                       0,                        0,                       0,                       1.74E-2*delta_t*delta_t;
+  this->_covariance_q << 5.5915E-4,         0,       0,       0,       0, 
+                                 0, 9.8645E-4,       0,       0,       0,
+                                 0,         0, 3.8E-03,       0,       0,
+                                 0,         0,       0, 4.1E-03,       0, 
+                                 0,         0,       0,       0, 5.6E-03;
+  // this->_covariance_r << 1.0*delta_t*delta_t, 0                  ,
+  //                        0                  , 1.0*delta_t*delta_t;
+  this->_covariance_r << 1.4475E-06,          0,
+                                  0, 1.6644E-06;
   this->_covariance_p = this->_covariance_q;
+
   this->_roll_pitch_bias << 0.0,
                             0.0,
                             0.0,
@@ -52,7 +58,6 @@ geometry_msgs::Vector3 Ekf::get_corrected(const geometry_msgs::Vector3& linear_a
   
   Matrix<double, 2, 1> actual_observation_angle = _get_actual_observation_angle();
 
-  //  Because observatio matrix H is identity, pre_angle is able to be used as pred_observation_angle
   Matrix<double, 5, 2> kalman_gain = _get_kalman_gain(pre_covariance_p);
   _update_covariance_p(kalman_gain, pre_covariance_p);
   return _get_corrected_angle(pre_roll_pitch_bais, actual_observation_angle, kalman_gain);
@@ -123,20 +128,22 @@ Matrix<double, 5, 1> Ekf::_predict_angle()
   Matrix<double, 3, 2> tri;
   tri = _get_trigonometric(this->_roll_pitch_bias);
 
-  Matrix<double, 2, 1> roll_pitch;
-  roll_pitch << _roll_pitch_bias(0),
-                _roll_pitch_bias(1);
+  Matrix<double, 3, 1> roll_pitch_yaw;
+  roll_pitch_yaw << _roll_pitch_bias(0),
+                    _roll_pitch_bias(1),
+                    this->_yaw         ;
 
   Matrix<double, 3, 1> angular_bais;
   angular_bais << _roll_pitch_bias(2),
                   _roll_pitch_bias(3),
                   _roll_pitch_bias(4);
                   
-  Matrix<double, 2, 3> A;
+  Matrix<double, 3, 3> A;
   A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
-       0.0, tri(1, 0)            ,      -1.0 * tri(0, 1); 
-  Matrix<double, 2, 1> pred_angle;
-  pred_angle = roll_pitch + this->_delta_t * (A * (this->_angular_vel - angular_bais));
+       0.0, tri(1, 0)            ,      -1.0 * tri(0, 1),
+       0.0, tri(0, 0) / tri(1, 1), tri(1, 0) / tri(1, 1);
+  Matrix<double, 3, 1> pred_angle;
+  pred_angle = roll_pitch_yaw + this->_delta_t * (A * (this->_angular_vel - angular_bais));
 
   Matrix<double, 5, 1> pred_roll_pitch_bais;
   pred_roll_pitch_bais << pred_angle(0),
@@ -146,8 +153,9 @@ Matrix<double, 5, 1> Ekf::_predict_angle()
                           angular_bais(2); 
 
   // predict yaw angle here to minimize tri calcurate
-  // this->_yaw += this->_delta_t * (((this->_angular_vel(1) - angular_bais(1)) * tri(0, 0)) / (tri(1, 1)) + ((this->_angular_vel(2) - angular_bais(2)) * tri(1, 0)) / tri(1, 1));
-  this->_yaw += this->_delta_t * ((this->_angular_vel(1) * tri(0, 0)) / (tri(1, 1)) + (this->_angular_vel(2) * tri(1, 0)) / tri(1, 1));
+  // this->_yaw += this->_delta_t * (((this->_angular_vel(1) - angular_bais(1)) * tri(0, 0)) / (tri(1, 1)) + ((this->_angular_vel(2) - angular_bais(1)) * tri(1, 0)) / tri(1, 1));
+  // this->_yaw += this->_delta_t * ((this->_angular_vel(1) * tri(0, 0)) / (tri(1, 1)) + (this->_angular_vel(2) * tri(1, 0)) / tri(1, 1));
+  // this->_yaw = pred_angle(2);
   return pred_roll_pitch_bais;
 }
 
@@ -163,7 +171,7 @@ Matrix<double, 5, 5> Ekf::_get_state_jacobian()
 
   Matrix<double, 5, 5> state_jacobian_F;
   state_jacobian_F << 1 + this->_delta_t * (biased_angular_vel(1) * tri(1,0) * tri(2,1) - biased_angular_vel(2) * tri(0,0) * tri(2,1)), this->_delta_t * ((biased_angular_vel(1) * tri(0,0)) / pow(tri(1,1), 2) + (biased_angular_vel(2) * tri(1,0)) / pow(tri(1,1), 2)), -1 * this->_delta_t, -1 * this->_delta_t * tri(0,0) * tri(2,1), -1 * this->_delta_t * tri(1,0) * tri(2,1),
-                     -1 * this->_delta_t * (biased_angular_vel(1))                                                                    , 1.0 + (-1) * biased_angular_vel(2) * tri(1,1)                                                                                   , 0                  , -1 * this->_delta_t * tri(1,0)           , -1 * this->_delta_t * tri(0,1)           ,
+                     -1 * this->_delta_t * biased_angular_vel(1) * tri(0,0)                                                           , 1.0                                                                                                                             , 0                  , -1 * this->_delta_t * tri(1,0)           , -1 * this->_delta_t * tri(0,0)           ,
                      0                                                                                                                , 0                                                                                                                               , 1                  , 0                                        , 0                                        ,
                      0                                                                                                                , 0                                                                                                                               , 0                  , 1                                        , 0                                        ,
                      0                                                                                                                , 0                                                                                                                               , 0                  , 0                                        , 1                                        ; 

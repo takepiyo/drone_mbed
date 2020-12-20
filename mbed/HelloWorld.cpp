@@ -3,6 +3,8 @@
 #include <BMI088.h>
 #include <Esc.h>
 #include <ExtendedKalmanFilter.h>
+#include <bmm150.h>
+#include "bmm150_defs.h"
 
 #include <ros.h>
 #include <std_msgs/String.h>
@@ -33,7 +35,11 @@ DigitalOut led3 = LED3;
 DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
-BMI088 bmi088(p9, p10, PERIOD);
+I2C ic2(p9, p10);
+i2c.frequency(100000);
+BMM150 bmm150(i2c);
+BMI088 bmi088(ic2, PERIOD);
+
 Ekf    ex_kalman_filter(PERIOD);
 
 Ticker timer;
@@ -50,6 +56,8 @@ geometry_msgs::Accel accel;
 ros::Publisher acc_gyro("acc_gyro", &accel);
 geometry_msgs::Vector3 linear_acc;
 geometry_msgs::Vector3 angular_vel;
+
+geometry_msgs::Vevtor3 magnetic;
 
 geometry_msgs::Vector3 RPY_raw;
 geometry_msgs::Vector3 RPY_raw_deg;
@@ -93,6 +101,14 @@ void get_acc_gyro()
     angular_vel.z = gz;
 }
 
+void get_mag()
+{
+    bmm150.read_mag_data();
+    magnetic.x = bmm.raw_mag_data.raw_datax;
+    magnetic.y = bmm.raw_mag_data.raw_datay;
+    magnetic.z = bmm.raw_mag_data.raw_dataz;
+}
+
 void publish_acc_gyro()
 {
     accel.linear = linear_acc;
@@ -125,12 +141,24 @@ void init_mbed()
     {
         if (bmi088.isConnection()) {
             bmi088.initialize();
+            led3 = 1;
             break;
         }
         led3 = !led3;
         wait_ms(200);
     }
-    led3 = 1;    
+    
+    while(1)
+    {
+        if (bmm150.initialize() == BMM150_E_ID_NOT_CONFORM){
+            led4 = !led4;
+            wait_ms(200);
+        }
+        else{
+            led4 = 1;
+            break;
+        }
+    }
 }
 
 void init_ros()

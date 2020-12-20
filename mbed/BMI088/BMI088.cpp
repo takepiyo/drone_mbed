@@ -29,11 +29,9 @@
 
 #include "BMI088.h"
 
-BMI088::BMI088(PinName sda, PinName scl, float period) : i2c(sda, scl)
+BMI088::BMI088(I2C i2c, float period)
 {
-  devAddrAcc = BMI088_ACC_ADDRESS;
-  devAddrGyro = BMI088_GYRO_ADDRESS;
-  i2c.frequency(100000);
+  this->i2c = i2c;
 
   acc_bias_x = 0.0;
   acc_bias_y = 0.0;
@@ -333,11 +331,11 @@ void BMI088::write8(device_type_t dev, char reg, uint8_t val)
 
   if (dev)
   {
-    addr = devAddrGyro;
+    addr = BMI088_GYRO_ADDRESS;
   }
   else
   {
-    addr = devAddrAcc;
+    addr = BMI088_ACC_ADDRESS;
   }
 
   i2c.write(addr, cmd, 2);
@@ -350,11 +348,11 @@ uint8_t BMI088::read8(device_type_t dev, char reg)
 
   if (dev)
   {
-    addr = devAddrGyro;
+    addr = BMI088_GYRO_ADDRESS;
   }
   else
   {
-    addr = devAddrAcc;
+    addr = BMI088_ACC_ADDRESS;
   }
 
   i2c.write(addr, &reg, 1);
@@ -371,11 +369,11 @@ uint16_t BMI088::read16(device_type_t dev, char reg)
 
   if (dev)
   {
-    addr = devAddrGyro;
+    addr = BMI088_GYRO_ADDRESS;
   }
   else
   {
-    addr = devAddrAcc;
+    addr = BMI088_ACC_ADDRESS;
   }
 
   i2c.write(addr, &reg, 1);
@@ -393,11 +391,11 @@ uint16_t BMI088::read16Be(device_type_t dev, char reg)
 
   if (dev)
   {
-    addr = devAddrGyro;
+    addr = BMI088_GYRO_ADDRESS;
   }
   else
   {
-    addr = devAddrAcc;
+    addr = BMI088_ACC_ADDRESS;
   }
 
   i2c.write(addr, &reg, 1);
@@ -413,11 +411,11 @@ uint32_t BMI088::read24(device_type_t dev, char reg)
 
   if (dev)
   {
-    addr = devAddrGyro;
+    addr = BMI088_GYRO_ADDRESS;
   }
   else
   {
-    addr = devAddrAcc;
+    addr = BMI088_ACC_ADDRESS;
   }
 
   i2c.write(addr, &reg, 1);
@@ -431,11 +429,11 @@ void BMI088::read(device_type_t dev, char reg, char *buf, uint16_t len)
   uint8_t addr = 0;
   if (dev)
   {
-    addr = devAddrGyro;
+    addr = BMI088_GYRO_ADDRESS;
   }
   else
   {
-    addr = devAddrAcc;
+    addr = BMI088_ACC_ADDRESS;
   }
 
   i2c.write(addr, &reg, 1);

@@ -1,17 +1,16 @@
 #include "bmm150.h"
-#include <Arduino.h>
-#include <Wire.h>
+#include "mbed.h"
 
 
-BMM150::BMM150() {
+BMM150::BMM150(I2C i2c) {
+    this->i2c = i2c
 }
 
 int8_t BMM150::initialize(void) {
-    Wire.begin();
 
     /* Power up the sensor from suspend to sleep mode */
     set_op_mode(BMM150_SLEEP_MODE);
-    delay(BMM150_START_UP_TIME);
+    wait_ms(BMM150_START_UP_TIME);
 
     /* Check chip ID */
     uint8_t id = i2c_read(BMM150_CHIP_ID_ADDR);
@@ -291,7 +290,7 @@ void BMM150::soft_reset() {
     reg_data = i2c_read(BMM150_POWER_CONTROL_ADDR);
     reg_data = reg_data | BMM150_SET_SOFT_RESET;
     i2c_write(BMM150_POWER_CONTROL_ADDR, reg_data);
-    delay(BMM150_SOFT_RESET_DELAY);
+    wait_ms(BMM150_SOFT_RESET_DELAY);
 }
 
 
@@ -304,48 +303,63 @@ void BMM150::set_odr(struct bmm150_settings settings) {
     i2c_write(BMM150_OP_MODE_ADDR, reg_data);
 }
 
-void BMM150::i2c_write(short address, short data) {
-    Wire.beginTransmission(BMM150_I2C_Address);
-    Wire.write(address);
-    Wire.write(data);
-    Wire.endTransmission();
+void BMM150::i2c_write(uint8_t address, uint8_t data) {
+    // Wire.beginTransmission(BMM150_I2C_Address);
+    // Wire.write(address);
+    // Wire.write(data);
+    // Wire.endTransmission();
+
+    char cmd[2];
+    cmd[0] = address
+    cmd[1] = data
+
+    i2c.write(BMM150_I2C_Address, cmd, 2);
 }
 
-void BMM150::i2c_read(short address, uint8_t* buffer, short length) {
-    Wire.beginTransmission(BMM150_I2C_Address);
-    Wire.write(address);
-    Wire.endTransmission();
-    Wire.requestFrom(BMM150_I2C_Address, length);
+void BMM150::i2c_read(uint8_t address, uint8_t* buffer, short length) {
+    // Wire.beginTransmission(BMM150_I2C_Address);
+    // Wire.write(address);
+    // Wire.endTransmission();
+    // Wire.requestFrom(BMM150_I2C_Address, length);
 
-    if (Wire.available() == length) {
-        for (uint8_t i = 0; i < length; i++) {
-            buffer[i] = Wire.read();
-        }
-    }
+    // if (Wire.available() == length) {
+    //     for (uint8_t i = 0; i < length; i++) {
+    //         buffer[i] = Wire.read();
+    //     }
+    // }
+
+    // char data;
+    i2c.write(BMM150_I2C_Address, &address, 1);
+    i2c.read(BMM150_I2C_Address, buffer, length);
 }
 
 
 void BMM150::i2c_read(short address, int8_t* buffer, short length) {
-    Wire.beginTransmission(BMM150_I2C_Address);
-    Wire.write(address);
-    Wire.endTransmission();
-    Wire.requestFrom(BMM150_I2C_Address, length);
+    // Wire.beginTransmission(BMM150_I2C_Address);
+    // Wire.write(address);
+    // Wire.endTransmission();
+    // Wire.requestFrom(BMM150_I2C_Address, length);
 
-    if (Wire.available() == length) {
-        for (uint8_t i = 0; i < length; i++) {
-            buffer[i] = Wire.read();
-        }
-    }
+    // if (Wire.available() == length) {
+    //     for (uint8_t i = 0; i < length; i++) {
+    //         buffer[i] = Wire.read();
+    //     }
+    // }
+    // char data;
+    i2c.write(BMM150_I2C_Address, &address, 1);
+    i2c.read(BMM150_I2C_Address, buffer, length);
 }
 
-uint8_t BMM150::i2c_read(short address) {
+uint8_t BMM150::i2c_read(uint8_t address) {
     uint8_t byte;
 
-    Wire.beginTransmission(BMM150_I2C_Address);
-    Wire.write(address);
-    Wire.endTransmission();
-    Wire.requestFrom(BMM150_I2C_Address, 1);
-    byte = Wire.read();
+    // Wire.beginTransmission(BMM150_I2C_Address);
+    // Wire.write(address);
+    // Wire.endTransmission();
+    // Wire.requestFrom(BMM150_I2C_Address, 1);
+    // byte = Wire.read();
+    i2c.write(BMM150_I2C_Address, &address, 1)
+    i2c.read(BMM150_I2C_Address, &byte, 1)
     return byte;
 }
 
@@ -394,7 +408,7 @@ void BMM150::set_op_mode(uint8_t pwr_mode) {
 void BMM150::suspend_to_sleep_mode(void) {
     set_power_control_bit(BMM150_POWER_CNTRL_ENABLE);
     /* Start-up time delay of 3ms*/
-    delay(3);
+    delay_ms(3);
 }
 
 

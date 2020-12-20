@@ -140,6 +140,8 @@ class BMM150 {
     void i2c_read(short address, int8_t* buffer, short length);
     uint8_t i2c_read(short address);
 
+    I2C i2c;
+
 };
 
 

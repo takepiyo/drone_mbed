@@ -3,8 +3,9 @@
 
 
 /** Includes */
-#include <Arduino.h>
-#include <Wire.h>
+// #include <Arduino.h>
+// #include <Wire.h>
+#include "mbed.h"
 #include "bmm150_defs.h"
 
 class BMM150 {

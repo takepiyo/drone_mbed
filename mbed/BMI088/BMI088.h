@@ -96,7 +96,7 @@
 
 #define BMI088_GYRO_SELF_TEST 0x3C
 
-#define CALIBRATION_COUNT 30
+#define CALIBRATION_COUNT 10
 // #define CUT_OFF_FREQUENCY 500 // [Hz]
 
 enum device_type_t

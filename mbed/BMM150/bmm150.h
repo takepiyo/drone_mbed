@@ -7,6 +7,8 @@
 // #include <Wire.h>
 #include "mbed.h"
 #include "bmm150_defs.h"
+#include <ros.h>
+#include <geometry_msgs/Vector3.h>
 
 class BMM150 {
 
@@ -121,7 +123,11 @@ class BMM150 {
     */
     void soft_reset();
 
+    void calibration();
 
+    geometry_msgs::Vector3 get_mag_data();
+
+    geometry_msgs::Vector3 get_offset();
     /**
 
     */
@@ -131,9 +137,9 @@ class BMM150 {
     // protected:
     struct bmm150_settings settings;
     struct bmm150_raw_mag_data raw_mag_data;
-    struct bmm150_mag_data mag_data;
+    struct bmm150_mag_data mag_data;    
+    struct bmm150_mag_data mag_offset_data;    
     struct bmm150_trim_registers trim_data;
-
 
     void i2c_write(uint8_t address, uint8_t byte);
     void i2c_read(uint8_t address, uint8_t* buffer, short length);

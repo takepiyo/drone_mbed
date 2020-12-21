@@ -19,6 +19,7 @@
 
 #define MOTOR_NUM 4
 #define PERIOD    0.01
+#define DO_CALIB 1
 
 void calibration_acc();
 
@@ -57,6 +58,9 @@ geometry_msgs::Vector3 angular_vel;
 
 geometry_msgs::Vector3 magnetic;
 ros::Publisher magne_pub("magnetic", &magnetic);
+
+geometry_msgs::Vector3 magnetic_offset;
+ros::Publisher magne_offset_pub("magnetic_offset", &magnetic_offset);
 
 geometry_msgs::Vector3 RPY_raw;
 geometry_msgs::Vector3 RPY_raw_deg;
@@ -103,9 +107,8 @@ void get_acc_gyro()
 void get_mag()
 {
     bmm150.read_mag_data();
-    magnetic.x = bmm150.raw_mag_data.raw_datax;
-    magnetic.y = bmm150.raw_mag_data.raw_datay;
-    magnetic.z = bmm150.raw_mag_data.raw_dataz;
+    magnetic = bmm150.get_mag_data();
+    magnetic_offset = bmm150.get_offset();
 }
 
 void publish_acc_gyro()
@@ -144,6 +147,20 @@ void init_mbed()
         }
         else{
             led4 = 1;
+            if(DO_CALIB)
+            {
+                wait_ms(1000);
+                led4 = 0;
+                for(int i = 0; i < 10; i++)
+                {
+                    led4 = !led4;
+                    wait_ms(10);
+                }
+                led4 = 1;
+                bmm150.calibration();
+                led4 = 0;
+                wait_ms(3000);
+            }
             break;
         }
     }
@@ -157,6 +174,7 @@ void init_mbed()
         led3 = !led3;
         wait_ms(200);
     }
+    led3 = 1;
     
 }
 
@@ -179,6 +197,7 @@ void init_ros()
     // nh.advertise(RPY_pub_acc);
     nh.advertise(biased_gyro_pub);
     nh.advertise(magne_pub);
+    nh.advertise(magne_offset_pub);
     // nh.advertise(no_filter_pub);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
@@ -202,6 +221,7 @@ int main()
         RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
         RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
         magne_pub.publish(&magnetic);
+        magne_offset_pub.publish(&magnetic_offset);
         // RPY_pub_raw.publish(&RPY_raw_deg);
         // RPY_pub_acc.publish(&RPY_acc);
         biased_gyro_pub.publish(&biased_gyro);

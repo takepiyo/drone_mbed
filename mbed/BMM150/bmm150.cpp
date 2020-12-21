@@ -1,10 +1,15 @@
 #include "bmm150.h"
 #include "mbed.h"
+#include <ros.h>
+#include <geometry_msgs/Vector3.h>
 
 
 BMM150::BMM150(PinName sda, PinName scl) : i2c(sda, scl)
 {
     i2c.frequency(100000);
+    mag_offset_data.x = 10;
+    mag_offset_data.y = 10;
+    mag_offset_data.z = 10;
 }
 
 int8_t BMM150::initialize(void) {
@@ -302,6 +307,66 @@ void BMM150::set_odr(struct bmm150_settings settings) {
     /*Set the ODR value */
     reg_data = BMM150_SET_BITS(reg_data, BMM150_ODR, settings.data_rate);
     i2c_write(BMM150_OP_MODE_ADDR, reg_data);
+}
+
+void BMM150::calibration()
+{
+    read_mag_data();
+    int16_t value_x_min = raw_mag_data.raw_datax;
+    int16_t value_x_max = raw_mag_data.raw_datax;
+    int16_t value_y_min = raw_mag_data.raw_datay;
+    int16_t value_y_max = raw_mag_data.raw_datay;
+    int16_t value_z_min = raw_mag_data.raw_dataz;
+    int16_t value_z_max = raw_mag_data.raw_dataz;
+    Timer timer;
+    timer.start();
+    while(timer.read() < 10)
+    {
+        read_mag_data();
+        if (value_x_min > raw_mag_data.raw_datax) {
+            value_x_min = raw_mag_data.raw_datax;
+
+        } else if (value_x_max < raw_mag_data.raw_datax) {
+            value_x_max = raw_mag_data.raw_datax;
+        }
+
+        /* Update y-Axis max/min value */
+        if (value_y_min > raw_mag_data.raw_datay) {
+            value_y_min = raw_mag_data.raw_datay;
+
+        } else if (value_y_max < raw_mag_data.raw_datay) {
+            value_y_max = raw_mag_data.raw_datay;
+        }
+
+        /* Update z-Axis max/min value */
+        if (value_z_min > raw_mag_data.raw_dataz) {
+            value_z_min = raw_mag_data.raw_dataz;
+
+        } else if (value_z_max < raw_mag_data.raw_dataz) {
+            value_z_max = raw_mag_data.raw_dataz;
+        }
+    }
+    mag_offset_data.x = value_x_min + (value_x_max - value_x_min) / 2;
+    mag_offset_data.y = value_x_min + (value_x_max - value_x_min) / 2;
+    mag_offset_data.z = value_x_min + (value_x_max - value_x_min) / 2;
+}
+
+geometry_msgs::Vector3 BMM150::get_mag_data()
+{
+    geometry_msgs::Vector3 output;
+    output.x = raw_mag_data.raw_datax - mag_offset_data.x;
+    output.y = raw_mag_data.raw_datay - mag_offset_data.y;
+    output.z = raw_mag_data.raw_dataz - mag_offset_data.z;
+    return output;
+}
+
+geometry_msgs::Vector3 BMM150::get_offset()
+{
+    geometry_msgs::Vector3 offset;
+    offset.x = mag_offset_data.x;
+    offset.y = mag_offset_data.y;
+    offset.z = mag_offset_data.z;
+    return offset;
 }
 
 void BMM150::i2c_write(uint8_t address, uint8_t data) {

@@ -35,11 +35,9 @@ DigitalOut led3 = LED3;
 DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
-I2C ic2(p9, p10);
-i2c.frequency(100000);
-BMM150 bmm150(i2c);
-BMI088 bmi088(ic2, PERIOD);
 
+BMM150 bmm150(p9, p10);
+BMI088 bmi088(p9, p10, PERIOD);
 Ekf    ex_kalman_filter(PERIOD);
 
 Ticker timer;
@@ -57,7 +55,8 @@ ros::Publisher acc_gyro("acc_gyro", &accel);
 geometry_msgs::Vector3 linear_acc;
 geometry_msgs::Vector3 angular_vel;
 
-geometry_msgs::Vevtor3 magnetic;
+geometry_msgs::Vector3 magnetic;
+ros::Publisher magne_pub("magnetic", &magnetic);
 
 geometry_msgs::Vector3 RPY_raw;
 geometry_msgs::Vector3 RPY_raw_deg;
@@ -104,9 +103,9 @@ void get_acc_gyro()
 void get_mag()
 {
     bmm150.read_mag_data();
-    magnetic.x = bmm.raw_mag_data.raw_datax;
-    magnetic.y = bmm.raw_mag_data.raw_datay;
-    magnetic.z = bmm.raw_mag_data.raw_dataz;
+    magnetic.x = bmm150.raw_mag_data.raw_datax;
+    magnetic.y = bmm150.raw_mag_data.raw_datay;
+    magnetic.z = bmm150.raw_mag_data.raw_dataz;
 }
 
 void publish_acc_gyro()
@@ -137,17 +136,6 @@ void init_mbed()
 {
     led3 = 0;
     led4 = 0;
-    while (1) 
-    {
-        if (bmi088.isConnection()) {
-            bmi088.initialize();
-            led3 = 1;
-            break;
-        }
-        led3 = !led3;
-        wait_ms(200);
-    }
-    
     while(1)
     {
         if (bmm150.initialize() == BMM150_E_ID_NOT_CONFORM){
@@ -159,6 +147,17 @@ void init_mbed()
             break;
         }
     }
+    while (1) 
+    {
+        if (bmi088.isConnection()) {
+            bmi088.initialize();
+            led3 = 1;
+            break;
+        }
+        led3 = !led3;
+        wait_ms(200);
+    }
+    
 }
 
 void init_ros()
@@ -173,12 +172,13 @@ void init_ros()
     nh.initNode();
     // nh.advertise(duties_pub);
     // nh.advertise(debugger);
-    // nh.advertise(acc_gyro);
+    nh.advertise(acc_gyro);
     nh.advertise(RPY_pub_kalman_deg);
     nh.advertise(RPY_pub_kalman_rad);
     // nh.advertise(RPY_pub_raw);
     // nh.advertise(RPY_pub_acc);
     nh.advertise(biased_gyro_pub);
+    nh.advertise(magne_pub);
     // nh.advertise(no_filter_pub);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
@@ -201,11 +201,12 @@ int main()
         // update_pose();
         RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
         RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
+        magne_pub.publish(&magnetic);
         // RPY_pub_raw.publish(&RPY_raw_deg);
         // RPY_pub_acc.publish(&RPY_acc);
         biased_gyro_pub.publish(&biased_gyro);
         // no_filter_pub.publish(&no_filter_pred);
-        // publish_acc_gyro();
+        publish_acc_gyro();
         nh.spinOnce();
         __enable_irq(); // 許可
         wait(PERIOD);
@@ -217,8 +218,9 @@ int main()
 void update_pose()
 {
     get_acc_gyro();
+    get_mag();
     // pose_from_acc();
-    RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel);
+    RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel, magnetic);
     no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
     rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
     // update_pose_without_kalman();

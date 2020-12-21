@@ -7,6 +7,8 @@ using namespace std;
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Transform.h>
 
+#define TBD 5.5915E-4
+
 Ekf::Ekf(double delta_t)
 {
   this->_delta_t = delta_t;

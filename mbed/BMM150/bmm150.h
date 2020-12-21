@@ -11,7 +11,7 @@
 class BMM150 {
 
   public:
-    BMM150();
+    BMM150(PinName sda, PinName scl);
     /**
         \brief initialze device
 
@@ -135,10 +135,10 @@ class BMM150 {
     struct bmm150_trim_registers trim_data;
 
 
-    void i2c_write(short address, short byte);
-    void i2c_read(short address, uint8_t* buffer, short length);
-    void i2c_read(short address, int8_t* buffer, short length);
-    uint8_t i2c_read(short address);
+    void i2c_write(uint8_t address, uint8_t byte);
+    void i2c_read(uint8_t address, uint8_t* buffer, short length);
+    void i2c_read(uint8_t address, int8_t* buffer, short length);
+    uint8_t i2c_read(uint8_t address);
 
     I2C i2c;
 

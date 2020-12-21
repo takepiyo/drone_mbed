@@ -29,9 +29,9 @@
 
 #include "BMI088.h"
 
-BMI088::BMI088(I2C i2c, float period)
+BMI088::BMI088(PinName sda, PinName scl, float period) : i2c(sda, scl)
 {
-  this->i2c = i2c;
+  i2c.frequency(100000);
 
   acc_bias_x = 0.0;
   acc_bias_y = 0.0;

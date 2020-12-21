@@ -2,8 +2,9 @@
 #include "mbed.h"
 
 
-BMM150::BMM150(I2C i2c) {
-    this->i2c = i2c
+BMM150::BMM150(PinName sda, PinName scl) : i2c(sda, scl)
+{
+    i2c.frequency(100000);
 }
 
 int8_t BMM150::initialize(void) {
@@ -310,8 +311,8 @@ void BMM150::i2c_write(uint8_t address, uint8_t data) {
     // Wire.endTransmission();
 
     char cmd[2];
-    cmd[0] = address
-    cmd[1] = data
+    cmd[0] = address;
+    cmd[1] = data;
 
     i2c.write(BMM150_I2C_Address, cmd, 2);
 }
@@ -328,13 +329,18 @@ void BMM150::i2c_read(uint8_t address, uint8_t* buffer, short length) {
     //     }
     // }
 
-    // char data;
-    i2c.write(BMM150_I2C_Address, &address, 1);
-    i2c.read(BMM150_I2C_Address, buffer, length);
+    char reg = address;
+    char data[length];
+    i2c.write(BMM150_I2C_Address, &reg, 1);
+    i2c.read(BMM150_I2C_Address, data, length);
+    for(uint8_t i = 0; i < length; i++)
+    {
+        buffer[i] = data[i];
+    }
 }
 
 
-void BMM150::i2c_read(short address, int8_t* buffer, short length) {
+void BMM150::i2c_read(uint8_t address, int8_t* buffer, short length) {
     // Wire.beginTransmission(BMM150_I2C_Address);
     // Wire.write(address);
     // Wire.endTransmission();
@@ -345,21 +351,30 @@ void BMM150::i2c_read(short address, int8_t* buffer, short length) {
     //         buffer[i] = Wire.read();
     //     }
     // }
-    // char data;
-    i2c.write(BMM150_I2C_Address, &address, 1);
-    i2c.read(BMM150_I2C_Address, buffer, length);
+    
+    char reg = address;
+    char data[length];
+    i2c.write(BMM150_I2C_Address, &reg, 1);
+    i2c.read(BMM150_I2C_Address, data, length);
+    for(uint8_t i = 0; i < length; i++)
+    {
+        buffer[i] = data[i];
+    }
 }
 
 uint8_t BMM150::i2c_read(uint8_t address) {
     uint8_t byte;
+    char data;
 
     // Wire.beginTransmission(BMM150_I2C_Address);
     // Wire.write(address);
     // Wire.endTransmission();
     // Wire.requestFrom(BMM150_I2C_Address, 1);
     // byte = Wire.read();
-    i2c.write(BMM150_I2C_Address, &address, 1)
-    i2c.read(BMM150_I2C_Address, &byte, 1)
+    char cmd = address;
+    i2c.write(BMM150_I2C_Address, &cmd, 1);
+    i2c.read(BMM150_I2C_Address, &data, 1);
+    byte = data;
     return byte;
 }
 
@@ -408,7 +423,7 @@ void BMM150::set_op_mode(uint8_t pwr_mode) {
 void BMM150::suspend_to_sleep_mode(void) {
     set_power_control_bit(BMM150_POWER_CNTRL_ENABLE);
     /* Start-up time delay of 3ms*/
-    delay_ms(3);
+    wait_ms(3);
 }
 
 

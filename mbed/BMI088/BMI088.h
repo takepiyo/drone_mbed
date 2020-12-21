@@ -208,8 +208,6 @@ private:
 
   float accRange;
   float gyroRange;
-  uint8_t devAddrAcc;
-  uint8_t devAddrGyro;
 
   float acc_bias_x;
   float acc_bias_y;

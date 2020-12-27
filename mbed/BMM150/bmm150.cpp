@@ -38,7 +38,7 @@ int8_t BMM150::initialize(void) {
     return BMM150_OK;
 }
 
-void BMM150::read_mag_data() {
+geometry_msgs::Vector3 BMM150::read_mag_data() {
     int16_t msb_data;
     int8_t reg_data[BMM150_XYZR_DATA_LEN] = {0};
 
@@ -75,6 +75,8 @@ void BMM150::read_mag_data() {
     mag_data.y = compensate_y(raw_mag_data.raw_datay, raw_mag_data.raw_data_r);
     /* Compensated Mag Z data in int16_t format */
     mag_data.z = compensate_z(raw_mag_data.raw_dataz, raw_mag_data.raw_data_r);
+
+    return get_mag_data();
 }
 
 /*

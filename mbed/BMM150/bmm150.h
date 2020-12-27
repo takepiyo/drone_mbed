@@ -23,7 +23,7 @@ class BMM150 {
     /**
         \brief Read magnetometer data
     */
-    void read_mag_data();
+    geometry_msgs::Vector3 read_mag_data();
 
     /**
         @brief This internal API is used to obtain the compensated

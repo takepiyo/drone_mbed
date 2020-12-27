@@ -21,13 +21,8 @@
 #define PERIOD    0.01
 #define DO_CALIB 0
 
-void calibration_acc();
-
 void update_pose();
-void publish_acc_gyro();
 void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree);
-void update_pose_without_kalman();
-void pose_from_acc();
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -48,23 +43,16 @@ ros::NodeHandle nh;
 // std_msgs::Float32MultiArray duties;
 std_msgs::Float32 duties;
 ros::Publisher duties_pub("now_duty", &duties);
-std_msgs::String echo;
-ros::Publisher debugger("debug_message", &echo); 
 
-geometry_msgs::Accel accel;
-ros::Publisher acc_gyro("acc_gyro", &accel);
-geometry_msgs::Vector3 linear_acc;
-geometry_msgs::Vector3 angular_vel;
+geometry_msgs::Vector3 acc;
+ros::Publisher acc_pub("acc", &acc);
+geometry_msgs::Vector3 gyro;
+ros::Publisher gyro_pub("gyro", &gyro);
+geometry_msgs::Vector3 magne;
+ros::Publisher magne_pub("magne", &magne);
 
-geometry_msgs::Vector3 magnetic;
-ros::Publisher magne_pub("magnetic", &magnetic);
-
-geometry_msgs::Vector3 magnetic_offset;
-ros::Publisher magne_offset_pub("magnetic_offset", &magnetic_offset);
-
-geometry_msgs::Vector3 RPY_raw;
-geometry_msgs::Vector3 RPY_raw_deg;
-ros::Publisher RPY_pub_raw("RPY_raw", &RPY_raw_deg);
+geometry_msgs::Vector3 magne_offset;
+ros::Publisher magne_offset_pub("magne_offset", &magne_offset);
 
 geometry_msgs::Vector3 RPY_kalman_deg;
 ros::Publisher RPY_pub_kalman_deg("RPY_kalman_deg", &RPY_kalman_deg);
@@ -72,54 +60,20 @@ ros::Publisher RPY_pub_kalman_deg("RPY_kalman_deg", &RPY_kalman_deg);
 geometry_msgs::Vector3 RPY_kalman_rad;
 ros::Publisher RPY_pub_kalman_rad("RPY_kalman_rad", &RPY_kalman_rad);
 
-geometry_msgs::Vector3 biased_gyro;
-ros::Publisher biased_gyro_pub("biased_gyro", &biased_gyro);
-
-geometry_msgs::Vector3 RPY_acc;
-ros::Publisher RPY_pub_acc("RPY_acc", &RPY_acc);
-
 geometry_msgs::Vector3 no_filter_pred;
 ros::Publisher no_filter_pred_pub("no_filter_pred", &no_filter_pred);
 
 geometry_msgs::Vector3 no_filter_obse;
 ros::Publisher no_filter_obse_pub("no_filter_obse", &no_filter_obse);
 
-void publish_string(string message)
-{
-    int length = message.length();
-    char char_array[length + 1];
-    strcpy(char_array, message.c_str());
-    echo.data = char_array;
-    debugger.publish(&echo);
-}
-
-void get_acc_gyro()
-{   
-    float ax = 0, ay = 0, az = 0;
-    float gx = 0, gy = 0, gz = 0;
-    bmi088.getAcceleration(&ax, &ay, &az);
-    bmi088.getGyroscope(&gx, &gy, &gz);
-    linear_acc.x = ax;
-    linear_acc.y = ay;
-    linear_acc.z = az;
-    angular_vel.x = gx;
-    angular_vel.y = gy;
-    angular_vel.z = gz;
-}
-
-void get_mag()
-{
-    bmm150.read_mag_data();
-    magnetic = bmm150.get_mag_data();
-    magnetic_offset = bmm150.get_offset();
-}
-
-void publish_acc_gyro()
-{
-    accel.linear = linear_acc;
-    accel.angular = angular_vel;
-    acc_gyro.publish(&accel);
-}
+// void publish_string(string message)
+// {
+//     int length = message.length();
+//     char char_array[length + 1];
+//     strcpy(char_array, message.c_str());
+//     echo.data = char_array;
+//     debugger.publish(&echo);
+// }
 
 void update_duties(const std_msgs::Float32& input_duties)
 {
@@ -184,26 +138,17 @@ void init_mbed()
 void init_ros()
 {
     duties.data = 0.0;
-    RPY_raw.x = 0.0;
-    RPY_raw.y = 0.0;
-    RPY_raw.z = 0.0;
-    RPY_acc.x = 0.0;
-    RPY_acc.y = 0.0;
-    RPY_acc.z = 0.0;
     nh.initNode();
     // nh.advertise(duties_pub);
     // nh.advertise(debugger);
-    nh.advertise(acc_gyro);
-    nh.advertise(RPY_pub_kalman_deg);
-    nh.advertise(RPY_pub_kalman_rad);
-    // nh.advertise(RPY_pub_raw);
-    // nh.advertise(RPY_pub_acc);
-    nh.advertise(biased_gyro_pub);
+    nh.advertise(acc_pub);
+    nh.advertise(gyro_pub);
     nh.advertise(magne_pub);
     nh.advertise(magne_offset_pub);
+    nh.advertise(RPY_pub_kalman_deg);
+    nh.advertise(RPY_pub_kalman_rad);
     nh.advertise(no_filter_pred_pub);
     nh.advertise(no_filter_obse_pub);
-    // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
 
@@ -218,20 +163,15 @@ int main()
     while(1)
     {
         __disable_irq(); // 禁止
-        // get_acc_gyro();
         // update_motor_rotation();
-        // publish_string("loop!");
-        // update_pose();
+        acc_pub.publish(&acc);
+        gyro_pub.publish(&gyro);
+        magne_pub.publish(&magne);
+        // magne_offset_pub.publish(&magnetic_offset);
         RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
         RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
-        magne_pub.publish(&magnetic);
-        magne_offset_pub.publish(&magnetic_offset);
-        // RPY_pub_raw.publish(&RPY_raw_deg);
-        // RPY_pub_acc.publish(&RPY_acc);
-        biased_gyro_pub.publish(&biased_gyro);
         no_filter_pred_pub.publish(&no_filter_pred);
         no_filter_obse_pub.publish(&no_filter_obse);
-        publish_acc_gyro();
         nh.spinOnce();
         __enable_irq(); // 許可
         wait(PERIOD);
@@ -242,15 +182,15 @@ int main()
 
 void update_pose()
 {
-    get_acc_gyro();
-    get_mag();
-    // pose_from_acc();
-    RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel, magnetic);
+    acc = bmi088.getAcceleration();
+    gyro = bmi088.getGyroscope();
+    magne = bmm150.read_mag_data();
+    magne_offset = bmm150.get_offset();
+
+    RPY_kalman_rad = ex_kalman_filter.get_corrected(acc, gyro, magne);
     no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
     no_filter_obse = ex_kalman_filter.get_observation_no_filter();
     rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
-    // update_pose_without_kalman();
-    // rad_to_deg(RPY_raw, RPY_raw_deg);
 }
 
 void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree)
@@ -258,18 +198,4 @@ void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& de
     degree.x = (radian.x * 180) / 3.1415;
     degree.y = (radian.y * 180) / 3.1415;
     degree.z = (radian.z * 180) / 3.1415; 
-}
-
-void update_pose_without_kalman()
-{
-    RPY_raw.x += PERIOD * (angular_vel.x + std::sin(RPY_raw.x) * std::tan(RPY_raw.y) * angular_vel.y + std::cos(RPY_raw.x) * std::tan(RPY_raw.y) * angular_vel.z);
-    RPY_raw.y += PERIOD * (std::cos(RPY_raw.x) * angular_vel.y - std::sin(RPY_raw.x) * angular_vel.z);
-    RPY_raw.z += PERIOD * ((std::sin(RPY_raw.x) * angular_vel.y) / (std::cos(RPY_raw.y)) + (std::cos(RPY_raw.x) * angular_vel.z)/(std::cos(RPY_raw.y)));
-}
-
-void pose_from_acc()
-{
-    RPY_acc.x = (atan2(linear_acc.y, linear_acc.z) * 180) / 3.1415;
-    RPY_acc.y = (-1 * atan2(linear_acc.x, sqrt(pow(linear_acc.y, 2) + pow(linear_acc.z, 2))) * 180) / 3.1415;
-    RPY_acc.z = 4545.0;
 }

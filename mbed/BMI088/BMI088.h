@@ -33,6 +33,8 @@
 // #include <Arduino.h>
 // #include <Wire.h>
 #include "mbed.h"
+#include "ros.h"
+#include "geometry_msgs/Vector3.h"
 
 #define BMI088_ACC_ADDRESS 0x19 << 1
 
@@ -177,12 +179,14 @@ public:
   void setGyroScaleRange(gyro_scale_type_t range);
   void setGyroOutputDataRate(gyro_odr_type_t odr);
 
-  void getAcceleration(float *x, float *y, float *z);
+  // void getAcceleration(float *x, float *y, float *z);
+  geometry_msgs::Vector3 getAcceleration();
   float getAccelerationX(void);
   float getAccelerationY(void);
   float getAccelerationZ(void);
 
-  void getGyroscope(float *x, float *y, float *z);
+  // void getGyroscope(float *x, float *y, float *z);
+  geometry_msgs::Vector3 getGyroscope();
   float getGyroscopeX(void);
   float getGyroscopeY(void);
   float getGyroscopeZ(void);

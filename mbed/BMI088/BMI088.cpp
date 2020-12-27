@@ -28,6 +28,8 @@
 */
 
 #include "BMI088.h"
+#include "ros.h"
+#include "geometry_msgs/Vector3.h"
 
 BMI088::BMI088(PinName sda, PinName scl, float period) : i2c(sda, scl)
 {
@@ -178,8 +180,9 @@ void BMI088::setGyroOutputDataRate(gyro_odr_type_t odr)
   write8(GYRO, BMI088_GYRO_BAND_WIDTH, (uint8_t)odr);
 }
 
-void BMI088::getAcceleration(float *x, float *y, float *z)
+geometry_msgs::Vector3 BMI088::getAcceleration()
 {
+  geometry_msgs::Vector3 output;
   //    uint8_t buf[6] = {0};
   char buf[6] = {0};
   uint16_t ax = 0, ay = 0, az = 0;
@@ -192,18 +195,22 @@ void BMI088::getAcceleration(float *x, float *y, float *z)
   az = buf[4] | (buf[5] << 8);
 
   value = (int16_t)ax;
-  *x = accRange * value / 32768000 * 9.79f - acc_bias_x; // units: m/s^2
+  // *x = accRange * value / 32768000 * 9.79f - acc_bias_x; // units: m/s^2
+  output.x = accRange * value / 32768000 * 9.79f - acc_bias_x; // units: m/s^2
 
   value = (int16_t)ay;
-  *y = accRange * value / 32768000 * 9.79f - acc_bias_y; // units: m/s^2
+  // *x = accRange * value / 32768000 * 9.79f - acc_bias_x; // units: m/s^2
+  output.y = accRange * value / 32768000 * 9.79f - acc_bias_y; // units: m/s^2
 
   value = (int16_t)az;
-  *z = accRange * value / 32768000 * 9.79f - acc_bias_z; // units: m/s^2
+  // *x = accRange * value / 32768000 * 9.79f - acc_bias_x; // units: m/s^2
+  output.z = accRange * value / 32768000 * 9.79f - acc_bias_z; // units: m/s^2
 
   // low pass filter
   // *x = (tau * pre_acc_x) / (tau + period) + (period * *x) / (tau + period);
   // *y = (tau * pre_acc_y) / (tau + period) + (period * *y) / (tau + period);
   // *z = (tau * pre_acc_z) / (tau + period) + (period * *z) / (tau + period);
+  return output;
 }
 
 float BMI088::getAccelerationX(void)
@@ -245,8 +252,9 @@ float BMI088::getAccelerationZ(void)
   return value;
 }
 
-void BMI088::getGyroscope(float *x, float *y, float *z)
+geometry_msgs::Vector3 BMI088::getGyroscope()
 {
+  geometry_msgs::Vector3 output;
   //    uint8_t buf[6] = {0};
   char buf[6] = {0};
   uint16_t gx = 0, gy = 0, gz = 0;
@@ -259,12 +267,15 @@ void BMI088::getGyroscope(float *x, float *y, float *z)
   gz = buf[4] | (buf[5] << 8);
 
   value = (int16_t)gx;
-  *x = gyroRange * value / 32768 * 3.1415927f / 180.0f;
+  // *x = gyroRange * value / 32768 * 3.1415927f / 180.0f;
+  output.x = gyroRange * value / 32768 * 3.1415927f / 180.0f;
   value = (int16_t)gy;
-  *y = gyroRange * value / 32768 * 3.1415927f / 180.0f;
-
+  // *y = gyroRange * value / 32768 * 3.1415927f / 180.0f;
+  output.y = gyroRange * value / 32768 * 3.1415927f / 180.0f;
   value = (int16_t)gz;
-  *z = gyroRange * value / 32768 * 3.1415927f / 180.0f;
+  // *z = gyroRange * value / 32768 * 3.1415927f / 180.0f;
+  output.z = gyroRange * value / 32768 * 3.1415927f / 180.0f;
+  return output;
 }
 
 float BMI088::getGyroscopeX(void)
@@ -445,11 +456,11 @@ void BMI088::calibrationAcc(void)
   float x_ave = 0.0, y_ave = 0.0, z_ave = 0.0;
   for(int i = 0; i < CALIBRATION_COUNT; i++)
   {
-    float ax = 0, ay = 0, az = 0;
-    getAcceleration(&ax, &ay, &az);
-    x_ave += ax / CALIBRATION_COUNT;
-    y_ave += ay / CALIBRATION_COUNT;
-    z_ave += (az - 9.79f) / CALIBRATION_COUNT;
+    geometry_msgs::Vector3 acc;
+    acc = getAcceleration();
+    x_ave += acc.x / CALIBRATION_COUNT;
+    y_ave += acc.y / CALIBRATION_COUNT;
+    z_ave += (acc.z - 9.79f) / CALIBRATION_COUNT;
     wait(period * 10);
   }
   acc_bias_x = x_ave;

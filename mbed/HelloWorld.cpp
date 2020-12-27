@@ -19,7 +19,7 @@
 
 #define MOTOR_NUM 4
 #define PERIOD    0.01
-#define DO_CALIB 1
+#define DO_CALIB 0
 
 void calibration_acc();
 
@@ -78,8 +78,11 @@ ros::Publisher biased_gyro_pub("biased_gyro", &biased_gyro);
 geometry_msgs::Vector3 RPY_acc;
 ros::Publisher RPY_pub_acc("RPY_acc", &RPY_acc);
 
-geometry_msgs::Transform no_filter_pred;
-ros::Publisher no_filter_pub("no_filter", &no_filter_pred);
+geometry_msgs::Vector3 no_filter_pred;
+ros::Publisher no_filter_pred_pub("no_filter_pred", &no_filter_pred);
+
+geometry_msgs::Vector3 no_filter_obse;
+ros::Publisher no_filter_obse_pub("no_filter_obse", &no_filter_obse);
 
 void publish_string(string message)
 {
@@ -198,7 +201,8 @@ void init_ros()
     nh.advertise(biased_gyro_pub);
     nh.advertise(magne_pub);
     nh.advertise(magne_offset_pub);
-    // nh.advertise(no_filter_pub);
+    nh.advertise(no_filter_pred_pub);
+    nh.advertise(no_filter_obse_pub);
     // publish_string("finish ros_init!!!");
     nh.subscribe(duties_sub);
 }
@@ -225,7 +229,8 @@ int main()
         // RPY_pub_raw.publish(&RPY_raw_deg);
         // RPY_pub_acc.publish(&RPY_acc);
         biased_gyro_pub.publish(&biased_gyro);
-        // no_filter_pub.publish(&no_filter_pred);
+        no_filter_pred_pub.publish(&no_filter_pred);
+        no_filter_obse_pub.publish(&no_filter_obse);
         publish_acc_gyro();
         nh.spinOnce();
         __enable_irq(); // 許可
@@ -242,6 +247,7 @@ void update_pose()
     // pose_from_acc();
     RPY_kalman_rad = ex_kalman_filter.get_corrected(linear_acc, angular_vel, magnetic);
     no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
+    no_filter_obse = ex_kalman_filter.get_observation_no_filter();
     rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
     // update_pose_without_kalman();
     // rad_to_deg(RPY_raw, RPY_raw_deg);

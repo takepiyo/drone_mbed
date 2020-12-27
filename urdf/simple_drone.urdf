@@ -2,11 +2,51 @@
 
   <link name="world"/>
 
-  <joint name="base_joint" type="floating">
+  <joint name="pred_joint" type="fixed">
     <parent link="world"/>
-    <child link="drone"/>
+    <child link="pred_base"/>
+    <origin xyz="1.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
   </joint>
-  <link name="drone">
+  <link name="pred_base"/>
+
+  <joint name="obse_joint" type="fixed">
+    <parent link="world"/>
+    <child link="obse_base"/>
+    <origin xyz="-1.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+  </joint>
+  <link name="obse_base"/>
+
+  <joint name="base_joint_kalman" type="floating">
+    <parent link="world"/>
+    <child link="drone_kalman"/>
+  </joint>
+  <link name="drone_kalman">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.5 0.7 0.01"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="base_joint_obse" type="floating">
+    <parent link="obse_base"/>
+    <child link="drone_obse"/>
+  </joint>
+  <link name="drone_obse">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.5 0.7 0.01"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="base_joint_pred" type="floating">
+    <parent link="pred_base"/>
+    <child link="drone_pred"/>
+  </joint>
+  <link name="drone_pred">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>

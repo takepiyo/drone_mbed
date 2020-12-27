@@ -15,7 +15,8 @@ class Ekf
                                        const geometry_msgs::Vector3& angular_vel,
                                        const geometry_msgs::Vector3& geomagnetism);
   geometry_msgs::Vector3 get_bais();
-  geometry_msgs::Transform get_predicted_value_no_filter();
+  geometry_msgs::Vector3 get_predicted_value_no_filter();
+  geometry_msgs::Vector3 get_observation_no_filter();
 
   private:
   double _delta_t;

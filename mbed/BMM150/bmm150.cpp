@@ -7,9 +7,9 @@
 BMM150::BMM150(PinName sda, PinName scl) : i2c(sda, scl)
 {
     i2c.frequency(100000);
-    mag_offset_data.x = 10;
-    mag_offset_data.y = 10;
-    mag_offset_data.z = 10;
+    mag_offset_data.x = -8.0;
+    mag_offset_data.y = -8.0;
+    mag_offset_data.z = -8.0;
 }
 
 int8_t BMM150::initialize(void) {
@@ -354,9 +354,9 @@ void BMM150::calibration()
 geometry_msgs::Vector3 BMM150::get_mag_data()
 {
     geometry_msgs::Vector3 output;
-    output.x = raw_mag_data.raw_datax - mag_offset_data.x;
-    output.y = raw_mag_data.raw_datay - mag_offset_data.y;
-    output.z = raw_mag_data.raw_dataz - mag_offset_data.z;
+    output.x = ((raw_mag_data.raw_datax - mag_offset_data.x) * 3.1415f) / (180);
+    output.y = - ((raw_mag_data.raw_datay - mag_offset_data.y) * 3.1415f) / (180);
+    output.z = ((raw_mag_data.raw_dataz - mag_offset_data.z) * 3.1415f) / (180);
     return output;
 }
 

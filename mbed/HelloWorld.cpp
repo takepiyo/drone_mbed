@@ -7,22 +7,23 @@
 #include "bmm150_defs.h"
 
 #include <ros.h>
-#include <std_msgs/String.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
+#include <std_msgs/String.h>
 
 #include <geometry_msgs/Accel.h>
 #include <geometry_msgs/Vector3.h>
 
-#include <vector>
 #include <bits/stdc++.h>
+#include <vector>
 
 #define MOTOR_NUM 4
-#define PERIOD    0.01
+#define PERIOD 0.01
 #define DO_CALIB 0
 
 void update_pose();
-void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree);
+void rad_to_deg(const geometry_msgs::Vector3 &radian,
+                geometry_msgs::Vector3 &degree);
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -34,7 +35,7 @@ Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
 
 BMM150 bmm150(p9, p10);
 BMI088 bmi088(p9, p10, PERIOD);
-Ekf    ex_kalman_filter(PERIOD);
+Ekf ex_kalman_filter(PERIOD);
 
 Ticker timer;
 
@@ -75,127 +76,115 @@ ros::Publisher no_filter_obse_pub("no_filter_obse", &no_filter_obse);
 //     debugger.publish(&echo);
 // }
 
-void update_duties(const std_msgs::Float32& input_duties)
-{
-    duties = input_duties;
-    led4 = !led4;
+void update_duties(const std_msgs::Float32 &input_duties) {
+  duties = input_duties;
+  led4   = !led4;
 }
 
-void update_motor_rotation()
-{
-    motor[0].update(duties.data);
-    motor[1].update(duties.data);
-    motor[2].update(duties.data);
-    motor[3].update(duties.data);
-    // motor.update(duties.data);
-    duties_pub.publish(&duties);
+void update_motor_rotation() {
+  motor[0].update(duties.data);
+  motor[1].update(duties.data);
+  motor[2].update(duties.data);
+  motor[3].update(duties.data);
+  // motor.update(duties.data);
+  duties_pub.publish(&duties);
 }
 ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_duties);
 
-void init_mbed()
-{
-    led3 = 0;
-    led4 = 0;
-    while(1)
-    {
-        if (bmm150.initialize() == BMM150_E_ID_NOT_CONFORM){
-            led4 = !led4;
-            wait_ms(200);
+void init_mbed() {
+  led3 = 0;
+  led4 = 0;
+  while (1) {
+    if (bmm150.initialize() == BMM150_E_ID_NOT_CONFORM) {
+      led4 = !led4;
+      wait_ms(200);
+    } else {
+      led4 = 1;
+      if (DO_CALIB) {
+        wait_ms(1000);
+        led4 = 0;
+        for (int i = 0; i < 10; i++) {
+          led4 = !led4;
+          wait_ms(10);
         }
-        else{
-            led4 = 1;
-            if(DO_CALIB)
-            {
-                wait_ms(1000);
-                led4 = 0;
-                for(int i = 0; i < 10; i++)
-                {
-                    led4 = !led4;
-                    wait_ms(10);
-                }
-                led4 = 1;
-                bmm150.calibration();
-                led4 = 0;
-                wait_ms(3000);
-            }
-            break;
-        }
+        led4 = 1;
+        bmm150.calibration();
+        led4 = 0;
+        wait_ms(3000);
+      }
+      break;
     }
-    while (1) 
-    {
-        if (bmi088.isConnection()) {
-            bmi088.initialize();
-            led3 = 1;
-            break;
-        }
-        led3 = !led3;
-        wait_ms(200);
+  }
+  while (1) {
+    if (bmi088.isConnection()) {
+      bmi088.initialize();
+      led3 = 1;
+      break;
     }
-    led3 = 1;
-    
+    led3 = !led3;
+    wait_ms(200);
+  }
+  led3 = 1;
 }
 
-void init_ros()
-{
-    duties.data = 0.0;
-    nh.initNode();
-    // nh.advertise(duties_pub);
-    // nh.advertise(debugger);
-    nh.advertise(acc_pub);
-    nh.advertise(gyro_pub);
-    nh.advertise(magne_pub);
-    nh.advertise(magne_offset_pub);
-    nh.advertise(RPY_pub_kalman_deg);
-    nh.advertise(RPY_pub_kalman_rad);
-    nh.advertise(no_filter_pred_pub);
-    nh.advertise(no_filter_obse_pub);
-    nh.subscribe(duties_sub);
+void init_ros() {
+  duties.data = 0.0;
+
+  nh.initNode();
+  // nh.advertise(duties_pub);
+  // nh.advertise(debugger);
+  nh.advertise(acc_pub);
+  nh.advertise(gyro_pub);
+  nh.advertise(magne_pub);
+  nh.advertise(magne_offset_pub);
+  nh.advertise(RPY_pub_kalman_deg);
+  nh.advertise(RPY_pub_kalman_rad);
+  nh.advertise(no_filter_pred_pub);
+  nh.advertise(no_filter_obse_pub);
+  nh.subscribe(duties_sub);
 }
 
-int main()
-{
-    led1 = 0;
-    init_ros();
-    init_mbed();
-    led1 = 1;
-    // publish_stri ng("start loop!");
-    timer.attach(&update_pose, PERIOD);
-    while(1)
-    {
-        __disable_irq(); // 禁止
-        // update_motor_rotation();
-        acc_pub.publish(&acc);
-        gyro_pub.publish(&gyro);
-        magne_pub.publish(&magne);
-        // magne_offset_pub.publish(&magnetic_offset);
-        RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
-        RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
-        no_filter_pred_pub.publish(&no_filter_pred);
-        no_filter_obse_pub.publish(&no_filter_obse);
-        nh.spinOnce();
-        __enable_irq(); // 許可
-        wait(PERIOD);
-        led2 = !led2;
-    }
-    return 0;
+int main() {
+  led1 = 0;
+  init_ros();
+  init_mbed();
+  led1 = 1;
+  // publish_stri ng("start loop!");
+  timer.attach(&update_pose, PERIOD);
+  while (1) {
+    __disable_irq();  // 禁止
+    // update_motor_rotation();
+    acc_pub.publish(&acc);
+    gyro_pub.publish(&gyro);
+    magne_pub.publish(&magne);
+    // magne_offset_pub.publish(&magnetic_offset);
+    RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
+    RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
+    no_filter_pred_pub.publish(&no_filter_pred);
+    no_filter_obse_pub.publish(&no_filter_obse);
+    nh.spinOnce();
+    __enable_irq();  // 許可
+    wait(PERIOD);
+    led2 = !led2;
+  }
+  return 0;
 }
 
-void update_pose()
-{
-    acc = bmi088.getAcceleration();
-    gyro = bmi088.getGyroscope();
-    magne = bmm150.read_mag_data();
-    magne_offset = bmm150.get_offset();
+void update_pose() {
+  acc          = bmi088.getAcceleration();
+  gyro         = bmi088.getGyroscope();
+  magne        = bmm150.read_mag_data();
+  magne_offset = bmm150.get_offset();
 
-    RPY_kalman_rad = ex_kalman_filter.get_corrected(acc, gyro, magne);
-    no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
-    no_filter_obse = ex_kalman_filter.get_observation_no_filter();
-    rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
+  RPY_kalman_rad = ex_kalman_filter.get_corrected(acc, gyro, magne);
+  no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
+  no_filter_obse = ex_kalman_filter.get_observation_no_filter();
+  rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
 }
 
-void rad_to_deg(const geometry_msgs::Vector3& radian, geometry_msgs::Vector3& degree)
-{
-    degree.x = (radian.x * 180) / 3.1415;
-    degree.y = (radian.y * 180) / 3.1415;
-    degree.z = (radian.z * 180) / 3.1415; 
+void rad_to_deg(const geometry_msgs::Vector3 &radian,
+                geometry_msgs::Vector3 &degree) {
+  degree.x = (radian.x * 180) / 3.1415;
+  degree.y = (radian.y * 180) / 3.1415;
+  degree.z = (radian.z * 180) / 3.1415;
 }

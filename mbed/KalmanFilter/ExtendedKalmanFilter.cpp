@@ -7,25 +7,33 @@ using namespace std;
 #include <geometry_msgs/Vector3.h>
 #include <ros.h>
 
-Ekf::Ekf(double delta_t) {
-  this->_delta_t = delta_t;
-  // clang-format off
-  this->_covariance_q << 5.5915E-4, 0        , 0        ,
-                         0        , 9.8645E-4, 0        ,
-                         0        , 0        , 5.5915E-4;
+#define PI 3.141592
 
-  this->_covariance_r << 1.4475E-06, 0         , 0         ,
-                         0         , 1.6644E-06, 0         ,
-                         0         , 0         , 1.4475E-06;
+Ekf::Ekf(double delta_t) {
+  this->_delta_t                          = delta_t;
+  this->_yaw_sign_reverse_count           = 0;
+  this->_no_filter_yaw_sign_reverse_count = 0;
+  // clang-format off
+  this->_covariance_q << 1.74E-2*this->_delta_t*this->_delta_t, 0                                   , 0                                   ,
+                         0                                   , 1.74E-2*this->_delta_t*this->_delta_t, 0                                   ,
+                         0                                   , 0                                   , 1.74E-2*this->_delta_t*this->_delta_t;
+
+  this->_covariance_r << 1.0 * this->_delta_t*this->_delta_t       , 0                                       , 0                                  ,
+                         0                                         , 1.0 * this->_delta_t*this->_delta_t     , 0                                  ,
+                         0                                         , 0                                       , 1.0 * this->_delta_t*this->_delta_t;
   this->_covariance_p = this->_covariance_q;
 
   this->_roll_pitch_yaw << 0.0,
                            0.0,
                            0.0;
 
-  this->_roll_pitch_raw_no_filter << 0.0,
-                                     0.0,
-                                     0.0;
+  this->_no_filter_pred << 0.0,
+                           0.0,
+                           0.0;
+
+  this->_no_filter_obse << 0.0,
+                           0.0,
+                           0.0;
 
   this->_observation_matrix_H << 1.0, 0.0, 0.0,
                                  0.0, 1.0, 0.0,
@@ -34,6 +42,14 @@ Ekf::Ekf(double delta_t) {
 }
 
 Ekf::~Ekf() {}
+
+void Ekf::init_yaw(geometry_msgs::Vector3& geomagnetism) {
+  double yaw               = atan2(-geomagnetism.y, geomagnetism.x);
+  this->_roll_pitch_yaw(2) = yaw;
+  this->_no_filter_pred(2) = yaw;
+  this->_no_filter_obse(2) = yaw;
+  this->_no_filter_yaw_raw = yaw;
+}
 
 geometry_msgs::Vector3 Ekf::get_corrected(
   const geometry_msgs::Vector3& linear_acc,
@@ -68,37 +84,43 @@ geometry_msgs::Vector3 Ekf::get_corrected(
 
 geometry_msgs::Vector3 Ekf::get_predicted_value_no_filter() {
   Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_roll_pitch_raw_no_filter);
+  tri = _get_trigonometric(this->_no_filter_pred);
   // clang-format off
   Matrix<double, 3, 3> A;
   A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
        0.0, tri(1, 0)            , -1.0 * tri(0, 0)     ,
        0.0, tri(0, 0) / tri(1, 1), tri(1, 0) / tri(1, 1);
 
-  this->_roll_pitch_raw_no_filter = this->_roll_pitch_raw_no_filter +
-                                    this->_delta_t * (A * (this->_angular_vel));
+  this->_no_filter_pred = this->_no_filter_pred + this->_delta_t * (A * (this->_angular_vel));
   // clang-format on
   geometry_msgs::Vector3 output;
-  output.x = this->_roll_pitch_raw_no_filter(0);
-  output.y = this->_roll_pitch_raw_no_filter(1);
-  output.z = this->_roll_pitch_raw_no_filter(2);
+  output.x = this->_no_filter_pred(0);
+  output.y = this->_no_filter_pred(1);
+  output.z = this->_no_filter_pred(2);
   return output;
 }
 
 geometry_msgs::Vector3 Ekf::get_observation_no_filter() {
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_roll_pitch_raw_no_filter);
   // clang-format off
-  Matrix<double, 3, 1> observation_angle;
-  observation_angle(0) = atan2(this->_linear_acc(1), this->_linear_acc(2));
-  observation_angle(1) = -1 * atan2(this->_linear_acc(0),hypot(this->_linear_acc(1), this->_linear_acc(2)));
-  observation_angle(2) = atan2(-(tri(1, 0) * this->_geomagnetism(1) - tri(0, 0) * this->_geomagnetism(2)), (tri(1, 1) * this->_geomagnetism(0) + tri(0, 1) * tri(0, 0) * this->_geomagnetism(1) + tri(0, 1) * tri(1, 0) * this->_geomagnetism(2)));
+  _no_filter_obse(0) = atan2(this->_linear_acc(1), this->_linear_acc(2));
+  _no_filter_obse(1) = atan2(-1 * this->_linear_acc(0), hypot(this->_linear_acc(1), this->_linear_acc(2)));
+  double previous_obse_yaw_raw = this->_no_filter_yaw_raw;
+  Matrix<double, 3, 2> tri;
+  tri = _get_trigonometric(this->_no_filter_obse);
+  this->_no_filter_yaw_raw = atan2(-(tri(1, 0) * this->_geomagnetism(1) - tri(0, 0) * this->_geomagnetism(2)), (tri(1, 1) * this->_geomagnetism(0) + tri(0, 1) * tri(0, 0) * this->_geomagnetism(1) + tri(0, 1) * tri(1, 0) * this->_geomagnetism(2)));
+  if (this->_no_filter_yaw_raw > 0 && previous_obse_yaw_raw < 0 && abs(this->_no_filter_yaw_raw - previous_obse_yaw_raw) > PI) { this->_no_filter_yaw_sign_reverse_count = this->_no_filter_yaw_sign_reverse_count - 1; }
+  if (this->_no_filter_yaw_raw < 0 && previous_obse_yaw_raw > 0 && abs(this->_no_filter_yaw_raw - previous_obse_yaw_raw) > PI) { this->_no_filter_yaw_sign_reverse_count = this->_no_filter_yaw_sign_reverse_count + 1; }
+  _no_filter_obse(2) =this->_no_filter_yaw_raw + 2 * PI * this->_no_filter_yaw_sign_reverse_count;
+
+  this->no_filter_yaw_test.x = this->_no_filter_yaw_sign_reverse_count;
+  this->no_filter_yaw_test.y = previous_obse_yaw_raw;
+  this->no_filter_yaw_test.z = this->_no_filter_yaw_raw;
 
   // clang-format on
   geometry_msgs::Vector3 output;
-  output.x = observation_angle(0);
-  output.y = observation_angle(1);
-  output.z = observation_angle(2);
+  output.x = _no_filter_obse(0);
+  output.y = _no_filter_obse(1);
+  output.z = _no_filter_obse(2);
   return output;
 }
 
@@ -125,7 +147,7 @@ Matrix<double, 3, 1> Ekf::_predict_angle() {
        0.0, tri(1, 0)            , -1.0 * tri(0, 0)     ,
        0.0, tri(0, 0) / tri(1, 1), tri(1, 0) / tri(1, 1);
   Matrix<double, 3, 1> pred_roll_pitch_yaw;
-  pred_roll_pitch_yaw = _roll_pitch_yaw + this->_delta_t * (A * (this->_angular_vel));
+  pred_roll_pitch_yaw = this->_roll_pitch_yaw + this->_delta_t * (A * (this->_angular_vel));
   // clang-format on
   return pred_roll_pitch_yaw;
 }
@@ -155,14 +177,19 @@ Matrix<double, 3, 3> Ekf::_predict_covariance_p(
 }
 
 Matrix<double, 3, 1> Ekf::_get_actual_observation_angle() {
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_roll_pitch_yaw);
   Matrix<double, 3, 1> observation_angle;
   // clang-format off
   observation_angle << atan2(this->_linear_acc(1), this->_linear_acc(2)),
-                       -1 * atan2(this->_linear_acc(0), hypot(this->_linear_acc(1), this->_linear_acc(2))),
-                       atan2(-(tri(1, 0) * this->_geomagnetism(1) - tri(0, 0) * this->_geomagnetism(2)), (tri(1, 1) * this->_geomagnetism(0) + tri(0, 1) * tri(0, 0) * this->_geomagnetism(1) + tri(0, 1) * tri(1, 0) * this->_geomagnetism(2)));
+                       atan2(-1 * this->_linear_acc(0), hypot(this->_linear_acc(1), this->_linear_acc(2))),
+                       0.0;
+  double previous_obse_yaw_raw = this->_yaw_raw;
+  Matrix<double, 3, 2> tri;
+  tri = _get_trigonometric(observation_angle);
+  this->_yaw_raw = atan2(-(tri(1, 0) * this->_geomagnetism(1) - tri(0, 0) * this->_geomagnetism(2)), (tri(1, 1) * this->_geomagnetism(0) + tri(0, 1) * tri(0, 0) * this->_geomagnetism(1) + tri(0, 1) * tri(1, 0) * this->_geomagnetism(2)));
   // clang-format on
+  if (this->_yaw_raw > 0 && previous_obse_yaw_raw < 0 && abs(this->_yaw_raw - previous_obse_yaw_raw) > PI) { this->_yaw_sign_reverse_count = this->_yaw_sign_reverse_count - 1; }
+  if (this->_yaw_raw < 0 && previous_obse_yaw_raw > 0 && abs(this->_yaw_raw - previous_obse_yaw_raw) > PI) { this->_yaw_sign_reverse_count = this->_yaw_sign_reverse_count + 1; }
+  observation_angle(2) = this->_yaw_raw + 2 * PI * this->_yaw_sign_reverse_count;
   return observation_angle;
 }
 

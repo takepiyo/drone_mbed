@@ -10,6 +10,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   Ekf(double delta_t);
   ~Ekf();
+  void init_yaw(geometry_msgs::Vector3 &geomagnetism);
   geometry_msgs::Vector3 get_corrected(
     const geometry_msgs::Vector3 &linear_acc,
     const geometry_msgs::Vector3 &angular_vel,
@@ -18,9 +19,16 @@ public:
   geometry_msgs::Vector3 get_predicted_value_no_filter();
   geometry_msgs::Vector3 get_observation_no_filter();
 
+  // test variable
+  geometry_msgs::Vector3 no_filter_yaw_test;
+
 private:
   double _delta_t;
-  double _yaw;
+
+  int _no_filter_yaw_sign_reverse_count;
+  double _no_filter_yaw_raw;
+  int _yaw_sign_reverse_count;
+  double _yaw_raw;
 
   // input values
   Matrix<double, 3, 1> _linear_acc;   //  m/s^2
@@ -39,8 +47,8 @@ private:
   Matrix<double, 3, 1> _roll_pitch_yaw;
 
   // to measure variance, no filtered angle
-  Matrix<double, 3, 1> _roll_pitch_raw_no_filter;
-  Matrix<double, 3, 1> _acc_angle_no_filter;
+  Matrix<double, 3, 1> _no_filter_pred;
+  Matrix<double, 3, 1> _no_filter_obse;
 
   Matrix<double, 3, 2> _get_trigonometric(
     const Matrix<double, 3, 1> &roll_pitch_yaw);

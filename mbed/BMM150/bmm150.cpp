@@ -5,9 +5,12 @@
 
 BMM150::BMM150(PinName sda, PinName scl) : i2c(sda, scl) {
   i2c.frequency(100000);
-  mag_offset_data.x = -8.0;
-  mag_offset_data.y = -8.0;
-  mag_offset_data.z = -8.0;
+  mag_offset.x     = 0.2369;
+  mag_offset.y     = -0.2366;
+  mag_offset.z     = 0.2967;
+  ellipsoid_axis.x = 7.2353;
+  ellipsoid_axis.y = 7.1569;
+  ellipsoid_axis.z = 3.3099;
 }
 
 int8_t BMM150::initialize(void) {
@@ -27,7 +30,8 @@ int8_t BMM150::initialize(void) {
 
   /*  Setting the preset mode as Low power mode
       i.e. data rate = 10Hz XY-rep = 1 Z-rep = 2*/
-  set_presetmode(BMM150_PRESETMODE_LOWPOWER);
+  // set_presetmode(BMM150_PRESETMODE_LOWPOWER);
+  set_presetmode(BMM150_PRESETMODE_HIGHACCURACY);
   // set_presetmode(BMM150_HIGHACCURACY_REPZ);
 
   return BMM150_OK;
@@ -349,33 +353,28 @@ void BMM150::calibration() {
       value_z_max = raw_mag_data.raw_dataz;
     }
   }
-  mag_offset_data.x = value_x_min + (value_x_max - value_x_min) / 2;
-  mag_offset_data.y = value_x_min + (value_x_max - value_x_min) / 2;
-  mag_offset_data.z = value_x_min + (value_x_max - value_x_min) / 2;
+  // mag_offset_data.x = value_x_min + (value_x_max - value_x_min) / 2;
+  // mag_offset_data.y = value_x_min + (value_x_max - value_x_min) / 2;
+  // mag_offset_data.z = value_x_min + (value_x_max - value_x_min) / 2;
 }
 
 geometry_msgs::Vector3 BMM150::get_mag_data() {
   geometry_msgs::Vector3 output;
-  output.x = ((raw_mag_data.raw_datax - mag_offset_data.x) * 3.1415f) / (180);
-  output.y = -((raw_mag_data.raw_datay - mag_offset_data.y) * 3.1415f) / (180);
-  output.z = ((raw_mag_data.raw_dataz - mag_offset_data.z) * 3.1415f) / (180);
+  output.x = (BMM150_XY_RANGE * mag_data.x / 8192.0 - mag_offset.x) * (ellipsoid_axis.x / ellipsoid_axis.x);
+  output.y = -(BMM150_XY_RANGE * mag_data.y / 8192.0 - mag_offset.y) * (ellipsoid_axis.x / ellipsoid_axis.y);
+  output.z = (BMM150_Z_RANGE * mag_data.z / 32768.0 - mag_offset.z) * (ellipsoid_axis.x / ellipsoid_axis.z);
   return output;
 }
 
 geometry_msgs::Vector3 BMM150::get_offset() {
   geometry_msgs::Vector3 offset;
-  offset.x = mag_offset_data.x;
-  offset.y = mag_offset_data.y;
-  offset.z = mag_offset_data.z;
+  offset.x = mag_offset.x;
+  offset.y = mag_offset.y;
+  offset.z = mag_offset.z;
   return offset;
 }
 
 void BMM150::i2c_write(uint8_t address, uint8_t data) {
-  // Wire.beginTransmission(BMM150_I2C_Address);
-  // Wire.write(address);
-  // Wire.write(data);
-  // Wire.endTransmission();
-
   char cmd[2];
   cmd[0] = address;
   cmd[1] = data;
@@ -384,17 +383,6 @@ void BMM150::i2c_write(uint8_t address, uint8_t data) {
 }
 
 void BMM150::i2c_read(uint8_t address, uint8_t* buffer, short length) {
-  // Wire.beginTransmission(BMM150_I2C_Address);
-  // Wire.write(address);
-  // Wire.endTransmission();
-  // Wire.requestFrom(BMM150_I2C_Address, length);
-
-  // if (Wire.available() == length) {
-  //     for (uint8_t i = 0; i < length; i++) {
-  //         buffer[i] = Wire.read();
-  //     }
-  // }
-
   char reg = address;
   char data[length];
   i2c.write(BMM150_I2C_Address, &reg, 1);
@@ -403,17 +391,6 @@ void BMM150::i2c_read(uint8_t address, uint8_t* buffer, short length) {
 }
 
 void BMM150::i2c_read(uint8_t address, int8_t* buffer, short length) {
-  // Wire.beginTransmission(BMM150_I2C_Address);
-  // Wire.write(address);
-  // Wire.endTransmission();
-  // Wire.requestFrom(BMM150_I2C_Address, length);
-
-  // if (Wire.available() == length) {
-  //     for (uint8_t i = 0; i < length; i++) {
-  //         buffer[i] = Wire.read();
-  //     }
-  // }
-
   char reg = address;
   char data[length];
   i2c.write(BMM150_I2C_Address, &reg, 1);
@@ -424,26 +401,12 @@ void BMM150::i2c_read(uint8_t address, int8_t* buffer, short length) {
 uint8_t BMM150::i2c_read(uint8_t address) {
   uint8_t byte;
   char data;
-
-  // Wire.beginTransmission(BMM150_I2C_Address);
-  // Wire.write(address);
-  // Wire.endTransmission();
-  // Wire.requestFrom(BMM150_I2C_Address, 1);
-  // byte = Wire.read();
   char cmd = address;
   i2c.write(BMM150_I2C_Address, &cmd, 1);
   i2c.read(BMM150_I2C_Address, &data, 1);
   byte = data;
   return byte;
 }
-
-// char* BMM150::getErrorText(short errorCode);
-// {
-//     if(ERRORCODE_1_NUM == 1)
-//     return ERRORCODE_1;
-
-//     return "Error not defined.";
-// }
 
 void BMM150::set_op_mode(uint8_t pwr_mode) {
   /* Select the power mode to set */

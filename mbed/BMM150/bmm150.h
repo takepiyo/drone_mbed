@@ -139,8 +139,10 @@ public:
   struct bmm150_settings settings;
   struct bmm150_raw_mag_data raw_mag_data;
   struct bmm150_mag_data mag_data;
-  struct bmm150_mag_data mag_offset_data;
+  //   struct bmm150_mag_data mag_offset_data;
   struct bmm150_trim_registers trim_data;
+  struct bmm150_mag_double mag_offset;
+  struct bmm150_mag_double ellipsoid_axis;
 
   void i2c_write(uint8_t address, uint8_t byte);
   void i2c_read(uint8_t address, uint8_t* buffer, short length);

@@ -218,10 +218,20 @@
 
 #define BMM150_GET_BITS_POS_0(reg_data, bitname) (reg_data & (bitname##_MSK))
 
+/**\micro tesra range*/
+#define BMM150_XY_RANGE (1300.0)
+#define BMM150_Z_RANGE (2500.0)
+
 struct bmm150_mag_data {
   int16_t x;
   int16_t y;
   int16_t z;
+};
+
+struct bmm150_mag_double {
+  double x;
+  double y;
+  double z;
 };
 
 /*

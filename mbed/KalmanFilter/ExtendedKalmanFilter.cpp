@@ -7,214 +7,190 @@ using namespace std;
 #include <geometry_msgs/Vector3.h>
 #include <ros.h>
 
-#define PI 3.141592
-
 Ekf::Ekf(double delta_t) {
-  this->_delta_t                          = delta_t;
-  this->_yaw_sign_reverse_count           = 0;
-  this->_no_filter_yaw_sign_reverse_count = 0;
-  // clang-format off
-  this->_covariance_q << 1.74E-2*this->_delta_t*this->_delta_t, 0                                   , 0                                   ,
-                         0                                   , 1.74E-2*this->_delta_t*this->_delta_t, 0                                   ,
-                         0                                   , 0                                   , 1.74E-2*this->_delta_t*this->_delta_t;
+  this->_delta_t = delta_t;
 
-  this->_covariance_r << 1.0 * this->_delta_t*this->_delta_t       , 0                                       , 0                                  ,
-                         0                                         , 1.0 * this->_delta_t*this->_delta_t     , 0                                  ,
-                         0                                         , 0                                       , 1.0 * this->_delta_t*this->_delta_t;
-  this->_covariance_p = this->_covariance_q;
+  _covariance_q(0) = 1.74E-2 * this->_delta_t * this->_delta_t;
+  _covariance_q(4) = 1.74E-2 * this->_delta_t * this->_delta_t;
+  _covariance_q(8) = 1.74E-2 * this->_delta_t * this->_delta_t;
 
-  this->_roll_pitch_yaw << 0.0,
-                           0.0,
-                           0.0;
+  _covariance_r(0)  = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(7)  = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(14) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(21) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(28) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(35) = 1.0 * this->_delta_t * this->_delta_t;
 
-  this->_no_filter_pred << 0.0,
-                           0.0,
-                           0.0;
+  _covariance_p(0)  = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_p(8)  = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_p(16) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_p(24) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_p(32) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_p(40) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_p(48) = 1.0 * this->_delta_t * this->_delta_t;
 
-  this->_no_filter_obse << 0.0,
-                           0.0,
-                           0.0;
+  _beta(0) = 0.0033;
+  _beta(4) = 0.0033;
+  _beta(8) = 0.0033;
 
-  this->_observation_matrix_H << 1.0, 0.0, 0.0,
-                                 0.0, 1.0, 0.0,
-                                 0.0, 0.0, 1.0;
-  // clang-format on
+  _G(12) = 1.0 * this->_delta_t * this->_delta_t;
+  _G(16) = 1.0 * this->_delta_t * this->_delta_t;
+  _G(20) = 1.0 * this->_delta_t * this->_delta_t;
+
+  grav_acc = 9.79;
+  mag_n    = 1.0;
+  mag_d    = 1.0;
+
+  _state_value << 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+
+  // TODO init yaw quaternion
 }
 
 Ekf::~Ekf() {}
 
-void Ekf::init_yaw(geometry_msgs::Vector3& geomagnetism) {
-  double yaw               = atan2(-geomagnetism.y, geomagnetism.x);
-  this->_roll_pitch_yaw(2) = yaw;
-  this->_no_filter_pred(2) = yaw;
-  this->_no_filter_obse(2) = yaw;
-  this->_no_filter_yaw_raw = yaw;
-}
-
-geometry_msgs::Vector3 Ekf::get_corrected(
+geometry_msgs::Quaternion Ekf::get_compensation_state(
   const geometry_msgs::Vector3& linear_acc,
   const geometry_msgs::Vector3& angular_vel,
   const geometry_msgs::Vector3& geomagnetism) {
   // clang-format off
-  this->_linear_acc << linear_acc.x,
-                       linear_acc.y,
-                       linear_acc.z;
+  Matrix<double, 3, 1> _gyro_sense;
+  _gyro_sense << angular_vel.x,
+                 angular_vel.y,
+                 angular_vel.z;
 
-  this->_angular_vel << angular_vel.x,
-                        angular_vel.y,
-                        angular_vel.z;
-
-  this->_geomagnetism << geomagnetism.x,
-                         geomagnetism.y,
-                         geomagnetism.z;
+  Matrix<double, 6, 1> _acc_geo_sense;
+  _acc_geo_sense << linear_acc.x,
+                    linear_acc.y,
+                    linear_acc.z,
+                    geomagnetism.x,
+                    geomagnetism.y,
+                    geomagnetism.z;
   // clang-format on
-  Matrix<double, 3, 1> pre_roll_pitch   = _predict_angle();
-  Matrix<double, 3, 3> state_jacobian_F = _get_state_jacobian();
-  Matrix<double, 3, 3> pre_covariance_p =
-    _predict_covariance_p(state_jacobian_F);
+  Matrix<double, 7, 1> predicted_state        = _get_predicted_state(_gyro_sense);
+  Matrix<double, 7, 7> predicted_jacobian_F   = _get_predicted_jacobian_F(_gyro_sense);
+  Matrix<double, 7, 7> predicted_covariance_p = _get_predicted_covariance_p(predicted_jacobian_F);
 
-  Matrix<double, 3, 1> actual_observation_angle =
-    _get_actual_observation_angle();
+  Matrix<double, 6, 7> observation_jacobian_H = _get_observation_jacobian_H(predicted_state);
+  Matrix<double, 6, 1> observation_state      = _get_observation_state(predicted_state);
+  Matrix<double, 7, 6> kalman_gain            = _get_kalman_gain(observation_jacobian_H, predicted_covariance_p);
+  _update_covariance_p(kalman_gain, observation_jacobian_H, predicted_covariance_p);
+  Matrix<double, 7, 1> compensation_state = _get_compensation_state(predicted_state, kalman_gain, _acc_geo_sense, observation_state);
 
-  Matrix<double, 3, 3> kalman_gain = _get_kalman_gain(pre_covariance_p);
-  _update_covariance_p(kalman_gain, pre_covariance_p);
-  return _get_corrected_angle(pre_roll_pitch, actual_observation_angle,
-                              kalman_gain);
+  geometry_msgs::Quaternion _compensation_quaternion;
+  _compensation_quaternion.w = compensation_state(0);
+  _compensation_quaternion.x = compensation_state(1);
+  _compensation_quaternion.y = compensation_state(2);
+  _compensation_quaternion.z = compensation_state(3);
+
+  return _compensation_quaternion;
 }
 
-geometry_msgs::Vector3 Ekf::get_predicted_value_no_filter() {
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_no_filter_pred);
+Matrix<double, 7, 1> Ekf::_get_predicted_state(const Matrix<double, 3, 1>& gyro_sense) {
+  double q_0     = _state_value(0);
+  double q_1     = _state_value(1);
+  double q_2     = _state_value(2);
+  double q_3     = _state_value(3);
+  double b_x     = _state_value(4);
+  double b_y     = _state_value(5);
+  double b_z     = _state_value(6);
+  double omega_x = gyro_sense(0) - b_x;
+  double omega_y = gyro_sense(1) - b_y;
+  double omega_z = gyro_sense(2) - b_z;
+  Matrix<double, 7, 1> predicted_state;
+  predicted_state(0) = q_0 + 0.5 * _delta_t * (-omega_x * q_1 - omega_y * q_2 - omega_z * q_3);
+  predicted_state(1) = q_1 + 0.5 * _delta_t * (omega_x * q_0 - omega_y * q_3 + omega_z * q_2);
+  predicted_state(2) = q_2 + 0.5 * _delta_t * (omega_x * q_3 + omega_y * q_0 - omega_z * q_1);
+  predicted_state(3) = q_3 + 0.5 * _delta_t * (-omega_x * q_2 + omega_y * q_1 + omega_z * q_0);
+  predicted_state(4) = -_beta(0) * _delta_t * b_x;
+  predicted_state(5) = -_beta(4) * _delta_t * b_y;
+  predicted_state(6) = -_beta(8) * _delta_t * b_z;
+  return predicted_state;
+}
+
+Matrix<double, 7, 7> Ekf::_get_predicted_jacobian_F(const Matrix<double, 3, 1>& gyro_sense) {
+  double q_0     = _state_value(0);
+  double q_1     = _state_value(1);
+  double q_2     = _state_value(2);
+  double q_3     = _state_value(3);
+  double b_x     = _state_value(4);
+  double b_y     = _state_value(5);
+  double b_z     = _state_value(6);
+  double omega_x = gyro_sense(0) - b_x;
+  double omega_y = gyro_sense(1) - b_y;
+  double omega_z = gyro_sense(2) - b_z;
   // clang-format off
-  Matrix<double, 3, 3> A;
-  A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
-       0.0, tri(1, 0)            , -1.0 * tri(0, 0)     ,
-       0.0, tri(0, 0) / tri(1, 1), tri(1, 0) / tri(1, 1);
-
-  this->_no_filter_pred = this->_no_filter_pred + this->_delta_t * (A * (this->_angular_vel));
+  Matrix<double, 7, 7> predicted_jacobian_F;
+  predicted_jacobian_F <<
+  1.0, -0.5 * _delta_t * omega_x, -0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_z, 0.5 * _delta_t * q_1, 0.5 * _delta_t * q_2, 0.5 * _delta_t * q_3,
+  0.5 * _delta_t * omega_x, 1.0, 0.5 * _delta_t * omega_z, -0.5 * _delta_t * omega_y, -0.5 * _delta_t * q_0, 0.5 * _delta_t * q_3, -0.5 * _delta_t * q_2,
+  0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_z, 1.0, 0.5 * _delta_t * omega_x, -0.5 * _delta_t * q_3, -0.5 * _delta_t * q_0, 0.5 * _delta_t * q_1,
+  0.5 * _delta_t * omega_z, 0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_x, 1.0, 0.5 * _delta_t * q_2, -0.5 * _delta_t * q_1, -0.5 * _delta_t * q_0,
+  0.0, 0.0, 0.0, 0.0, -_beta(0) * _delta_t, 0.0, 0.0,
+  0.0, 0.0, 0.0, 0.0, 0.0, -_beta(4) * _delta_t, 0.0,
+  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -_beta(8) * _delta_t;
   // clang-format on
-  geometry_msgs::Vector3 output;
-  output.x = this->_no_filter_pred(0);
-  output.y = this->_no_filter_pred(1);
-  output.z = this->_no_filter_pred(2);
-  return output;
+  return predicted_jacobian_F;
 }
 
-geometry_msgs::Vector3 Ekf::get_observation_no_filter() {
+Matrix<double, 7, 7> Ekf::_get_predicted_covariance_p(const Matrix<double, 7, 7>& predicted_jacobian_F) {
+  Matrix<double, 7, 7> predicted_covariance_p;
+  predicted_covariance_p = predicted_jacobian_F * _covariance_p * predicted_jacobian_F.transpose() + _G * _covariance_q * _G.transpose();
+  return predicted_covariance_p;
+}
+
+Matrix<double, 6, 7> Ekf::_get_observation_jacobian_H(const Matrix<double, 7, 1>& predicted_state) {
+  double q_0 = predicted_state(0);
+  double q_1 = predicted_state(1);
+  double q_2 = predicted_state(2);
+  double q_3 = predicted_state(3);
   // clang-format off
-  _no_filter_obse(0) = atan2(this->_linear_acc(1), this->_linear_acc(2));
-  _no_filter_obse(1) = atan2(-1 * this->_linear_acc(0), hypot(this->_linear_acc(1), this->_linear_acc(2)));
-  double previous_obse_yaw_raw = this->_no_filter_yaw_raw;
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_no_filter_obse);
-  this->_no_filter_yaw_raw = atan2(-(tri(1, 0) * this->_geomagnetism(1) - tri(0, 0) * this->_geomagnetism(2)), (tri(1, 1) * this->_geomagnetism(0) + tri(0, 1) * tri(0, 0) * this->_geomagnetism(1) + tri(0, 1) * tri(1, 0) * this->_geomagnetism(2)));
-  if (this->_no_filter_yaw_raw > 0 && previous_obse_yaw_raw < 0 && abs(this->_no_filter_yaw_raw - previous_obse_yaw_raw) > PI) { this->_no_filter_yaw_sign_reverse_count = this->_no_filter_yaw_sign_reverse_count - 1; }
-  if (this->_no_filter_yaw_raw < 0 && previous_obse_yaw_raw > 0 && abs(this->_no_filter_yaw_raw - previous_obse_yaw_raw) > PI) { this->_no_filter_yaw_sign_reverse_count = this->_no_filter_yaw_sign_reverse_count + 1; }
-  _no_filter_obse(2) =this->_no_filter_yaw_raw + 2 * PI * this->_no_filter_yaw_sign_reverse_count;
-
-  this->no_filter_yaw_test.x = this->_no_filter_yaw_sign_reverse_count;
-  this->no_filter_yaw_test.y = previous_obse_yaw_raw;
-  this->no_filter_yaw_test.z = this->_no_filter_yaw_raw;
-
+  Matrix<double, 6, 7> observation_jacobian_H;
+  observation_jacobian_H <<
+  -2.0 * grav_acc * q_2, 2.0 * grav_acc * q_3, -2.0 * grav_acc *q_0, 2.0 * grav_acc * q_1, 0.0, 0.0, 0.0,
+  2.0 * grav_acc * q_1, 2.0 * grav_acc * q_0, 2.0 * grav_acc * q_3, 2.0 * grav_acc * q_2, 0.0, 0.0, 0.0,
+  2.0 * grav_acc * q_0, -2.0 * grav_acc * q_1, -2.0 * grav_acc * q_2, 2.0 * grav_acc * q_3, 0.0, 0.0, 0.0,
+  2.0 * (q_0 * mag_n - q_2 * mag_d),  2.0 * (q_1 * mag_n + q_3 * mag_d), 2.0 * (-q_2 * mag_n - q_0 * mag_d), 2.0 * (-q_3 * mag_n + q_1 * mag_d), 0.0, 0.0, 0.0,
+  2.0 * (-q_3 * mag_n + q_1 * mag_d), 2.0 * (q_2 * mag_n + q_0 * mag_d), 2.0 * (q_1 * mag_n + q_3 * mag_d),  2.0 * (-q_0 * mag_n + q_2 * mag_d), 0.0, 0.0, 0.0,
+  2.0 * (q_2 * mag_n + q_0 * mag_d),  2.0 * (q_3 * mag_n - q_1 * mag_d), 2.0 * (q_0 * mag_n - q_2 * mag_d),  2.0 * (q_1 * mag_n + q_3 * mag_d),  0.0, 0.0, 0.0;
   // clang-format on
-  geometry_msgs::Vector3 output;
-  output.x = _no_filter_obse(0);
-  output.y = _no_filter_obse(1);
-  output.z = _no_filter_obse(2);
-  return output;
+  return observation_jacobian_H;
 }
 
-Matrix<double, 3, 2> Ekf::_get_trigonometric(
-  const Matrix<double, 3, 1>& roll_pitch_yaw) {
-  Matrix<double, 3, 2> trigonometric;
-  double roll  = roll_pitch_yaw(0);
-  double pitch = roll_pitch_yaw(1);
+Matrix<double, 6, 1> Ekf::_get_observation_state(const Matrix<double, 7, 1>& predicted_state) {
+  double q_0 = predicted_state(0);
+  double q_1 = predicted_state(1);
+  double q_2 = predicted_state(2);
+  double q_3 = predicted_state(3);
+  Matrix<double, 6, 1> observation_state;
   // clang-format off
-  trigonometric << sin(roll), sin(pitch),
-                   cos(roll), cos(pitch),
-                   tan(roll), tan(pitch);
+  observation_state << 2 * (q_1 * q_3 - q_0 * q_2) * grav_acc,
+                       2 * (q_2 * q_3 + q_0 * q_1) * grav_acc,
+                       (q_0 * q_0 - q_1 * q_1 - q_2 * q_2 + q_3 * q_3) * grav_acc,
+                       (q_0 * q_0 + q_1 * q_1 - q_2 * q_2 - q_3 * q_3) * mag_n + 2 * (q_1 * q_3 - q_0 * q_2) * mag_d,
+                       2 * (q_1 * q_2 - q_0 * q_3) * mag_n + 2 * (q_2 * q_3 + q_0 * q_1) * mag_d,
+                       2 * (q_1 * q_3 + q_0 * q_2) * mag_n + (q_0 * q_0 - q_1 * q_1 - q_2 * q_2 + q_3 * q_3) * mag_d;
   // clang-format on
-  return trigonometric;
+  return observation_state;
 }
 
-Matrix<double, 3, 1> Ekf::_predict_angle() {
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_roll_pitch_yaw);
-
-  Matrix<double, 3, 3> A;
-  // clang-format off
-  A << 1.0, tri(0, 0) * tri(2, 1), tri(1, 0) * tri(2, 1),
-       0.0, tri(1, 0)            , -1.0 * tri(0, 0)     ,
-       0.0, tri(0, 0) / tri(1, 1), tri(1, 0) / tri(1, 1);
-  Matrix<double, 3, 1> pred_roll_pitch_yaw;
-  pred_roll_pitch_yaw = this->_roll_pitch_yaw + this->_delta_t * (A * (this->_angular_vel));
-  // clang-format on
-  return pred_roll_pitch_yaw;
+Matrix<double, 7, 6> Ekf::_get_kalman_gain(const Matrix<double, 6, 7>& observation_jacobian_H,
+                                           const Matrix<double, 7, 7>& predicted_covariance_p) {
+  Matrix<double, 7, 6> kalman_gain;
+  kalman_gain = predicted_covariance_p * observation_jacobian_H.transpose() * (observation_jacobian_H * predicted_covariance_p * observation_jacobian_H.transpose() + _covariance_r).inverse();
+  return kalman_gain;
 }
 
-Matrix<double, 3, 3> Ekf::_get_state_jacobian() {
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(this->_roll_pitch_yaw);
-
-  Matrix<double, 3, 3> state_jacobian_F;
-  state_jacobian_F(0, 0) = 1 + this->_delta_t * (this->_angular_vel(1) * tri(1, 0) * tri(2, 1) - this->_angular_vel(2) * tri(0, 0) * tri(2, 1));
-  state_jacobian_F(0, 1) = this->_delta_t * ((this->_angular_vel(1) * tri(0, 0)) / pow(tri(1, 1), 2) + (this->_angular_vel(2) * tri(1, 0)) / pow(tri(1, 1), 2));
-  state_jacobian_F(0, 2) = 0.0;
-  state_jacobian_F(1, 0) = -1 * this->_delta_t * (this->_angular_vel(1) * tri(0, 0) + this->_angular_vel(2) * tri(1, 0));
-  state_jacobian_F(1, 1) = 1.0;
-  state_jacobian_F(1, 2) = 0.0;
-  state_jacobian_F(2, 0) = this->_delta_t * ((this->_angular_vel(1) * tri(1, 0)) / tri(1, 1));
-  state_jacobian_F(2, 1) = this->_delta_t * ((_angular_vel(1) * tri(2, 1) * tri(0, 0)) / tri(1, 1) + (_angular_vel(2) * tri(2, 1) * tri(1, 0)) / tri(1, 1));
-  state_jacobian_F(2, 2) = 1.0;
-  return state_jacobian_F;
+void Ekf::_update_covariance_p(const Matrix<double, 7, 6>& kalman_gain,
+                               const Matrix<double, 6, 7>& observation_jacobian_H,
+                               const Matrix<double, 7, 7>& predicted_covariance_p) {
+  _covariance_p = predicted_covariance_p - kalman_gain * observation_jacobian_H * predicted_covariance_p;
 }
 
-Matrix<double, 3, 3> Ekf::_predict_covariance_p(
-  const Matrix<double, 3, 3>& state_jacobian_F) {
-  Matrix<double, 3, 3> pre_covariance_p;
-  pre_covariance_p = state_jacobian_F * this->_covariance_p * state_jacobian_F.transpose() + this->_covariance_q;
-  return pre_covariance_p;
-}
-
-Matrix<double, 3, 1> Ekf::_get_actual_observation_angle() {
-  Matrix<double, 3, 1> observation_angle;
-  // clang-format off
-  observation_angle << atan2(this->_linear_acc(1), this->_linear_acc(2)),
-                       atan2(-1 * this->_linear_acc(0), hypot(this->_linear_acc(1), this->_linear_acc(2))),
-                       0.0;
-  double previous_obse_yaw_raw = this->_yaw_raw;
-  Matrix<double, 3, 2> tri;
-  tri = _get_trigonometric(observation_angle);
-  this->_yaw_raw = atan2(-(tri(1, 0) * this->_geomagnetism(1) - tri(0, 0) * this->_geomagnetism(2)), (tri(1, 1) * this->_geomagnetism(0) + tri(0, 1) * tri(0, 0) * this->_geomagnetism(1) + tri(0, 1) * tri(1, 0) * this->_geomagnetism(2)));
-  // clang-format on
-  if (this->_yaw_raw > 0 && previous_obse_yaw_raw < 0 && abs(this->_yaw_raw - previous_obse_yaw_raw) > PI) { this->_yaw_sign_reverse_count = this->_yaw_sign_reverse_count - 1; }
-  if (this->_yaw_raw < 0 && previous_obse_yaw_raw > 0 && abs(this->_yaw_raw - previous_obse_yaw_raw) > PI) { this->_yaw_sign_reverse_count = this->_yaw_sign_reverse_count + 1; }
-  observation_angle(2) = this->_yaw_raw + 2 * PI * this->_yaw_sign_reverse_count;
-  return observation_angle;
-}
-
-Matrix<double, 3, 3> Ekf::_get_kalman_gain(
-  const Matrix<double, 3, 3>& pre_covariance_p) {
-  Matrix<double, 3, 3> _kalman_gain;
-  _kalman_gain = pre_covariance_p * this->_observation_matrix_H.transpose() *
-                 (this->_observation_matrix_H * pre_covariance_p * this->_observation_matrix_H.transpose() + this->_covariance_r).inverse();
-  return _kalman_gain;
-}
-
-void Ekf::_update_covariance_p(const Matrix<double, 3, 3>& kalman_gain,
-                               const Matrix<double, 3, 3>& pre_covariance_p) {
-  this->_covariance_p = (Matrix<double, 3, 3>::Identity() - kalman_gain * this->_observation_matrix_H) * pre_covariance_p;
-}
-
-geometry_msgs::Vector3 Ekf::_get_corrected_angle(
-  const Matrix<double, 3, 1>& pre_roll_pitch_yaw,
-  const Matrix<double, 3, 1>& actual_observation_angle,
-  const Matrix<double, 3, 3>& kalman_gain) {
-  geometry_msgs::Vector3 output;
-  this->_roll_pitch_yaw = pre_roll_pitch_yaw + kalman_gain * (actual_observation_angle - this->_observation_matrix_H * pre_roll_pitch_yaw);
-
-  output.x = this->_roll_pitch_yaw(0);
-  output.y = this->_roll_pitch_yaw(1);
-  output.z = this->_roll_pitch_yaw(2);
-  return output;
+Matrix<double, 7, 1> Ekf::_get_compensation_state(const Matrix<double, 7, 1>& predicted_state,
+                                                  const Matrix<double, 7, 6>& kalman_gain,
+                                                  const Matrix<double, 6, 1>& acc_geo_sense,
+                                                  const Matrix<double, 6, 1>& observation_state) {
+  Matrix<double, 7, 1> compensation_state;
+  compensation_state = predicted_state + kalman_gain * (acc_geo_sense - observation_state);
+  return compensation_state;
 }

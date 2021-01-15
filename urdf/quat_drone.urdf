@@ -1,0 +1,17 @@
+<robot name="simple_drone">
+
+  <link name="world"/>
+
+  <joint name="base_joint_kalman" type="floating">
+    <parent link="world"/>
+    <child link="quat_drone"/>
+  </joint>
+  <link name="quat_drone">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.8 0.6 0.01"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>

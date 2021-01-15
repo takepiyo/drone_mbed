@@ -5,7 +5,7 @@
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 
-void tf_kalman_publish(const geometry_msgs::Quaternion& quat) {
+void tf_kalman_publish(const geometry_msgs::Vector3& rpy) {
   static tf2_ros::TransformBroadcaster br;
   geometry_msgs::TransformStamped transformstamped;
 
@@ -15,12 +15,12 @@ void tf_kalman_publish(const geometry_msgs::Quaternion& quat) {
   transformstamped.transform.translation.x = 0.0;
   transformstamped.transform.translation.y = 0.0;
   transformstamped.transform.translation.z = 1.0;
-  // tf2::Quaternion q;
-  // q.setRPY(rpy.x, rpy.y, rpy.z);
-  transformstamped.transform.rotation.w = quat.w;
-  transformstamped.transform.rotation.x = quat.x;
-  transformstamped.transform.rotation.y = quat.y;
-  transformstamped.transform.rotation.z = quat.z;
+  tf2::Quaternion q;
+  q.setRPY(rpy.x, rpy.y, rpy.z);
+  transformstamped.transform.rotation.w = q.getW();
+  transformstamped.transform.rotation.x = q.getX();
+  transformstamped.transform.rotation.y = q.getY();
+  transformstamped.transform.rotation.z = q.getZ();
   br.sendTransform(transformstamped);
 }
 
@@ -97,10 +97,9 @@ void static_tf2_broadcast() {
 }
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "pose_publisher_to_tf");
+  ros::init(argc, argv, "rpy_publisher_to_tf");
   ros::NodeHandle nh;
-  // ros::Subscriber RPY_kalman_sub = nh.subscribe("/RPY_kalman_rad", 1000, tf_kalman_publish);
-  ros::Subscriber RPY_kalman_sub = nh.subscribe("/quat", 1000, tf_kalman_publish);
+  ros::Subscriber RPY_kalman_sub = nh.subscribe("/RPY_kalman_rad", 1000, tf_kalman_publish);
   ros::Subscriber RPY_obse_sub   = nh.subscribe("/no_filter_obse", 1000, tf_obse_publish);
   ros::Subscriber RPY_pred_sub   = nh.subscribe("/no_filter_pred", 1000, tf_pred_publish);
   static_tf2_broadcast();

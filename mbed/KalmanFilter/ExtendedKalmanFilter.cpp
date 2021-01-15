@@ -3,6 +3,7 @@
 using namespace Eigen;
 using namespace std;
 
+#include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Transform.h>
 #include <geometry_msgs/Vector3.h>
 #include <ros.h>
@@ -10,9 +11,9 @@ using namespace std;
 Ekf::Ekf(double delta_t) {
   this->_delta_t = delta_t;
 
-  _covariance_q(0) = 1.74E-2 * this->_delta_t * this->_delta_t;
-  _covariance_q(4) = 1.74E-2 * this->_delta_t * this->_delta_t;
-  _covariance_q(8) = 1.74E-2 * this->_delta_t * this->_delta_t;
+  _covariance_q(0) = 1.74E-2 * this->_delta_t;
+  _covariance_q(4) = 1.74E-2 * this->_delta_t;
+  _covariance_q(8) = 1.74E-2 * this->_delta_t;
 
   _covariance_r(0)  = 1.0 * this->_delta_t * this->_delta_t;
   _covariance_r(7)  = 1.0 * this->_delta_t * this->_delta_t;
@@ -33,13 +34,13 @@ Ekf::Ekf(double delta_t) {
   _beta(4) = 0.0033;
   _beta(8) = 0.0033;
 
-  _G(12) = 1.0 * this->_delta_t * this->_delta_t;
-  _G(16) = 1.0 * this->_delta_t * this->_delta_t;
-  _G(20) = 1.0 * this->_delta_t * this->_delta_t;
+  _G(12) = 1.0;
+  _G(16) = 1.0;
+  _G(20) = 1.0;
 
   grav_acc = 9.79;
-  mag_n    = 1.0;
-  mag_d    = 1.0;
+  mag_n    = 4.6888;
+  mag_d    = 5.5035;
 
   _state_value << 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
 
@@ -77,10 +78,10 @@ geometry_msgs::Quaternion Ekf::get_compensation_state(
   Matrix<double, 7, 1> compensation_state = _get_compensation_state(predicted_state, kalman_gain, _acc_geo_sense, observation_state);
 
   geometry_msgs::Quaternion _compensation_quaternion;
-  _compensation_quaternion.w = compensation_state(0);
-  _compensation_quaternion.x = compensation_state(1);
-  _compensation_quaternion.y = compensation_state(2);
-  _compensation_quaternion.z = compensation_state(3);
+  _compensation_quaternion.w = round(compensation_state(0) * 100) / 100;
+  _compensation_quaternion.x = round(compensation_state(1) * 100) / 100;
+  _compensation_quaternion.y = round(compensation_state(2) * 100) / 100;
+  _compensation_quaternion.z = round(compensation_state(3) * 100) / 100;
 
   return _compensation_quaternion;
 }
@@ -101,9 +102,9 @@ Matrix<double, 7, 1> Ekf::_get_predicted_state(const Matrix<double, 3, 1>& gyro_
   predicted_state(1) = q_1 + 0.5 * _delta_t * (omega_x * q_0 - omega_y * q_3 + omega_z * q_2);
   predicted_state(2) = q_2 + 0.5 * _delta_t * (omega_x * q_3 + omega_y * q_0 - omega_z * q_1);
   predicted_state(3) = q_3 + 0.5 * _delta_t * (-omega_x * q_2 + omega_y * q_1 + omega_z * q_0);
-  predicted_state(4) = -_beta(0) * _delta_t * b_x;
-  predicted_state(5) = -_beta(4) * _delta_t * b_y;
-  predicted_state(6) = -_beta(8) * _delta_t * b_z;
+  predicted_state(4) = b_x - _beta(0) * _delta_t * b_x;
+  predicted_state(5) = b_y - _beta(4) * _delta_t * b_y;
+  predicted_state(6) = b_z - _beta(8) * _delta_t * b_z;
   return predicted_state;
 }
 
@@ -125,9 +126,9 @@ Matrix<double, 7, 7> Ekf::_get_predicted_jacobian_F(const Matrix<double, 3, 1>& 
   0.5 * _delta_t * omega_x, 1.0, 0.5 * _delta_t * omega_z, -0.5 * _delta_t * omega_y, -0.5 * _delta_t * q_0, 0.5 * _delta_t * q_3, -0.5 * _delta_t * q_2,
   0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_z, 1.0, 0.5 * _delta_t * omega_x, -0.5 * _delta_t * q_3, -0.5 * _delta_t * q_0, 0.5 * _delta_t * q_1,
   0.5 * _delta_t * omega_z, 0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_x, 1.0, 0.5 * _delta_t * q_2, -0.5 * _delta_t * q_1, -0.5 * _delta_t * q_0,
-  0.0, 0.0, 0.0, 0.0, -_beta(0) * _delta_t, 0.0, 0.0,
-  0.0, 0.0, 0.0, 0.0, 0.0, -_beta(4) * _delta_t, 0.0,
-  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -_beta(8) * _delta_t;
+  0.0, 0.0, 0.0, 0.0, 1 - _beta(0) * _delta_t, 0.0, 0.0,
+  0.0, 0.0, 0.0, 0.0, 0.0, 1 - _beta(4) * _delta_t, 0.0,
+  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1 - _beta(8) * _delta_t;
   // clang-format on
   return predicted_jacobian_F;
 }

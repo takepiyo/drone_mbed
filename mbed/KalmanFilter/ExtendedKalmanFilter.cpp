@@ -11,40 +11,20 @@ using namespace std;
 Ekf::Ekf(double delta_t) {
   this->_delta_t = delta_t;
 
-  _covariance_q(0) = 1.74E-2 * this->_delta_t;
-  _covariance_q(4) = 1.74E-2 * this->_delta_t;
-  _covariance_q(8) = 1.74E-2 * this->_delta_t;
+  _covariance_q(0)  = 1.74E-2 * this->_delta_t;
+  _covariance_q(5)  = 1.74E-2 * this->_delta_t;
+  _covariance_q(10) = 1.74E-2 * this->_delta_t;
+  _covariance_q(15) = 1.74E-2 * this->_delta_t;
 
-  _covariance_r(0)  = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_r(7)  = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_r(14) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_r(21) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_r(28) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_r(35) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(0) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(4) = 1.0 * this->_delta_t * this->_delta_t;
+  _covariance_r(8) = 1.0 * this->_delta_t * this->_delta_t;
 
-  _covariance_p(0)  = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_p(8)  = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_p(16) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_p(24) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_p(32) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_p(40) = 1.0 * this->_delta_t * this->_delta_t;
-  _covariance_p(48) = 1.0 * this->_delta_t * this->_delta_t;
-
-  _beta(0) = 0.0033;
-  _beta(4) = 0.0033;
-  _beta(8) = 0.0033;
-
-  _G(12) = 1.0;
-  _G(16) = 1.0;
-  _G(20) = 1.0;
+  _covariance_p = _covariance_q;
 
   grav_acc = 9.79;
-  mag_n    = 4.6888;
-  mag_d    = 5.5035;
 
-  _state_value << 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-
-  // TODO init yaw quaternion
+  _state_value << 1.0, 0.0, 0.0, 0.0;
 }
 
 Ekf::~Ekf() {}
@@ -59,139 +39,103 @@ geometry_msgs::Quaternion Ekf::get_compensation_state(
                  angular_vel.y,
                  angular_vel.z;
 
-  Matrix<double, 6, 1> _acc_geo_sense;
+  Matrix<double, 3, 1> _acc_geo_sense;
   _acc_geo_sense << linear_acc.x,
                     linear_acc.y,
-                    linear_acc.z,
-                    geomagnetism.x,
-                    geomagnetism.y,
-                    geomagnetism.z;
+                    linear_acc.z;
   // clang-format on
-  Matrix<double, 7, 1> predicted_state        = _get_predicted_state(_gyro_sense);
-  Matrix<double, 7, 7> predicted_jacobian_F   = _get_predicted_jacobian_F(_gyro_sense);
-  Matrix<double, 7, 7> predicted_covariance_p = _get_predicted_covariance_p(predicted_jacobian_F);
+  Matrix<double, 4, 1> predicted_state        = _get_predicted_state(_gyro_sense);
+  Matrix<double, 4, 4> predicted_jacobian_F   = _get_predicted_jacobian_F(_gyro_sense);
+  Matrix<double, 4, 4> predicted_covariance_p = _get_predicted_covariance_p(predicted_jacobian_F);
 
-  Matrix<double, 6, 7> observation_jacobian_H = _get_observation_jacobian_H(predicted_state);
-  Matrix<double, 6, 1> observation_state      = _get_observation_state(predicted_state);
-  Matrix<double, 7, 6> kalman_gain            = _get_kalman_gain(observation_jacobian_H, predicted_covariance_p);
+  Matrix<double, 3, 4> observation_jacobian_H = _get_observation_jacobian_H(predicted_state);
+  Matrix<double, 3, 1> observation_state      = _get_observation_state(predicted_state);
+  Matrix<double, 4, 3> kalman_gain            = _get_kalman_gain(observation_jacobian_H, predicted_covariance_p);
   _update_covariance_p(kalman_gain, observation_jacobian_H, predicted_covariance_p);
-  Matrix<double, 7, 1> compensation_state = _get_compensation_state(predicted_state, kalman_gain, _acc_geo_sense, observation_state);
+  Matrix<double, 4, 1> com_quat = _get_compensation_state(predicted_state, kalman_gain, _acc_geo_sense, observation_state);
+
+  double quat_norm = sqrt(com_quat(0) * com_quat(0) + com_quat(1) * com_quat(1) + com_quat(2) * com_quat(2) + com_quat(3) * com_quat(3));
 
   geometry_msgs::Quaternion _compensation_quaternion;
-  _compensation_quaternion.w = round(compensation_state(0) * 100) / 100;
-  _compensation_quaternion.x = round(compensation_state(1) * 100) / 100;
-  _compensation_quaternion.y = round(compensation_state(2) * 100) / 100;
-  _compensation_quaternion.z = round(compensation_state(3) * 100) / 100;
+  _compensation_quaternion.w = com_quat(0) / quat_norm;
+  _compensation_quaternion.x = com_quat(1) / quat_norm;
+  _compensation_quaternion.y = com_quat(2) / quat_norm;
+  _compensation_quaternion.z = com_quat(3) / quat_norm;
 
   return _compensation_quaternion;
 }
 
-Matrix<double, 7, 1> Ekf::_get_predicted_state(const Matrix<double, 3, 1>& gyro_sense) {
-  double q_0     = _state_value(0);
-  double q_1     = _state_value(1);
-  double q_2     = _state_value(2);
-  double q_3     = _state_value(3);
-  double b_x     = _state_value(4);
-  double b_y     = _state_value(5);
-  double b_z     = _state_value(6);
-  double omega_x = gyro_sense(0) - b_x;
-  double omega_y = gyro_sense(1) - b_y;
-  double omega_z = gyro_sense(2) - b_z;
-  Matrix<double, 7, 1> predicted_state;
-  predicted_state(0) = q_0 + 0.5 * _delta_t * (-omega_x * q_1 - omega_y * q_2 - omega_z * q_3);
-  predicted_state(1) = q_1 + 0.5 * _delta_t * (omega_x * q_0 - omega_y * q_3 + omega_z * q_2);
-  predicted_state(2) = q_2 + 0.5 * _delta_t * (omega_x * q_3 + omega_y * q_0 - omega_z * q_1);
-  predicted_state(3) = q_3 + 0.5 * _delta_t * (-omega_x * q_2 + omega_y * q_1 + omega_z * q_0);
-  predicted_state(4) = b_x - _beta(0) * _delta_t * b_x;
-  predicted_state(5) = b_y - _beta(4) * _delta_t * b_y;
-  predicted_state(6) = b_z - _beta(8) * _delta_t * b_z;
+Matrix<double, 4, 1> Ekf::_get_predicted_state(const Matrix<double, 3, 1>& gyro_sense) {
+  double omega_x_dt = 0.5 * _delta_t * gyro_sense(0);
+  double omega_y_dt = 0.5 * _delta_t * gyro_sense(1);
+  double omega_z_dt = 0.5 * _delta_t * gyro_sense(2);
+  Matrix<double, 4, 4> f;
+  f << 1, -omega_x_dt, -omega_y_dt, -omega_z_dt,
+    omega_x_dt, 1, omega_z_dt, -omega_y_dt,
+    omega_y_dt, -omega_z_dt, 1, omega_x_dt,
+    omega_z_dt, omega_y_dt, -omega_x_dt, 1;
+
+  Matrix<double, 4, 1> predicted_state;
+  predicted_state = f * _state_value;
   return predicted_state;
 }
 
-Matrix<double, 7, 7> Ekf::_get_predicted_jacobian_F(const Matrix<double, 3, 1>& gyro_sense) {
-  double q_0     = _state_value(0);
-  double q_1     = _state_value(1);
-  double q_2     = _state_value(2);
-  double q_3     = _state_value(3);
-  double b_x     = _state_value(4);
-  double b_y     = _state_value(5);
-  double b_z     = _state_value(6);
-  double omega_x = gyro_sense(0) - b_x;
-  double omega_y = gyro_sense(1) - b_y;
-  double omega_z = gyro_sense(2) - b_z;
-  // clang-format off
-  Matrix<double, 7, 7> predicted_jacobian_F;
-  predicted_jacobian_F <<
-  1.0, -0.5 * _delta_t * omega_x, -0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_z, 0.5 * _delta_t * q_1, 0.5 * _delta_t * q_2, 0.5 * _delta_t * q_3,
-  0.5 * _delta_t * omega_x, 1.0, 0.5 * _delta_t * omega_z, -0.5 * _delta_t * omega_y, -0.5 * _delta_t * q_0, 0.5 * _delta_t * q_3, -0.5 * _delta_t * q_2,
-  0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_z, 1.0, 0.5 * _delta_t * omega_x, -0.5 * _delta_t * q_3, -0.5 * _delta_t * q_0, 0.5 * _delta_t * q_1,
-  0.5 * _delta_t * omega_z, 0.5 * _delta_t * omega_y, -0.5 * _delta_t * omega_x, 1.0, 0.5 * _delta_t * q_2, -0.5 * _delta_t * q_1, -0.5 * _delta_t * q_0,
-  0.0, 0.0, 0.0, 0.0, 1 - _beta(0) * _delta_t, 0.0, 0.0,
-  0.0, 0.0, 0.0, 0.0, 0.0, 1 - _beta(4) * _delta_t, 0.0,
-  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1 - _beta(8) * _delta_t;
-  // clang-format on
+Matrix<double, 4, 4> Ekf::_get_predicted_jacobian_F(const Matrix<double, 3, 1>& gyro_sense) {
+  double omega_x_dt = 0.5 * _delta_t * gyro_sense(0);
+  double omega_y_dt = 0.5 * _delta_t * gyro_sense(1);
+  double omega_z_dt = 0.5 * _delta_t * gyro_sense(2);
+  Matrix<double, 4, 4> predicted_jacobian_F;
+  predicted_jacobian_F << 1, -omega_x_dt, -omega_y_dt, -omega_z_dt,
+    omega_x_dt, 1, omega_z_dt, -omega_y_dt,
+    omega_y_dt, -omega_z_dt, 1, omega_x_dt,
+    omega_z_dt, omega_y_dt, -omega_x_dt, 1;
   return predicted_jacobian_F;
 }
 
-Matrix<double, 7, 7> Ekf::_get_predicted_covariance_p(const Matrix<double, 7, 7>& predicted_jacobian_F) {
-  Matrix<double, 7, 7> predicted_covariance_p;
-  predicted_covariance_p = predicted_jacobian_F * _covariance_p * predicted_jacobian_F.transpose() + _G * _covariance_q * _G.transpose();
+Matrix<double, 4, 4> Ekf::_get_predicted_covariance_p(const Matrix<double, 4, 4>& predicted_jacobian_F) {
+  Matrix<double, 4, 4> predicted_covariance_p;
+  predicted_covariance_p = predicted_jacobian_F * _covariance_p * predicted_jacobian_F.transpose() + _covariance_q;
   return predicted_covariance_p;
 }
 
-Matrix<double, 6, 7> Ekf::_get_observation_jacobian_H(const Matrix<double, 7, 1>& predicted_state) {
-  double q_0 = predicted_state(0);
-  double q_1 = predicted_state(1);
-  double q_2 = predicted_state(2);
-  double q_3 = predicted_state(3);
-  // clang-format off
-  Matrix<double, 6, 7> observation_jacobian_H;
-  observation_jacobian_H <<
-  -2.0 * grav_acc * q_2, 2.0 * grav_acc * q_3, -2.0 * grav_acc *q_0, 2.0 * grav_acc * q_1, 0.0, 0.0, 0.0,
-  2.0 * grav_acc * q_1, 2.0 * grav_acc * q_0, 2.0 * grav_acc * q_3, 2.0 * grav_acc * q_2, 0.0, 0.0, 0.0,
-  2.0 * grav_acc * q_0, -2.0 * grav_acc * q_1, -2.0 * grav_acc * q_2, 2.0 * grav_acc * q_3, 0.0, 0.0, 0.0,
-  2.0 * (q_0 * mag_n - q_2 * mag_d),  2.0 * (q_1 * mag_n + q_3 * mag_d), 2.0 * (-q_2 * mag_n - q_0 * mag_d), 2.0 * (-q_3 * mag_n + q_1 * mag_d), 0.0, 0.0, 0.0,
-  2.0 * (-q_3 * mag_n + q_1 * mag_d), 2.0 * (q_2 * mag_n + q_0 * mag_d), 2.0 * (q_1 * mag_n + q_3 * mag_d),  2.0 * (-q_0 * mag_n + q_2 * mag_d), 0.0, 0.0, 0.0,
-  2.0 * (q_2 * mag_n + q_0 * mag_d),  2.0 * (q_3 * mag_n - q_1 * mag_d), 2.0 * (q_0 * mag_n - q_2 * mag_d),  2.0 * (q_1 * mag_n + q_3 * mag_d),  0.0, 0.0, 0.0;
-  // clang-format on
+Matrix<double, 3, 4> Ekf::_get_observation_jacobian_H(const Matrix<double, 4, 1>& predicted_state) {
+  Matrix<double, 3, 4> observation_jacobian_H;
+  observation_jacobian_H << -predicted_state(2), predicted_state(3), -predicted_state(0), predicted_state(1),
+    predicted_state(1), predicted_state(0), predicted_state(3), predicted_state(2),
+    predicted_state(0), -predicted_state(1), -predicted_state(2), predicted_state(3);
+  observation_jacobian_H *= 2 * grav_acc;
+
   return observation_jacobian_H;
 }
 
-Matrix<double, 6, 1> Ekf::_get_observation_state(const Matrix<double, 7, 1>& predicted_state) {
-  double q_0 = predicted_state(0);
-  double q_1 = predicted_state(1);
-  double q_2 = predicted_state(2);
-  double q_3 = predicted_state(3);
-  Matrix<double, 6, 1> observation_state;
+Matrix<double, 3, 1> Ekf::_get_observation_state(const Matrix<double, 4, 1>& predicted_state) {
+  Matrix<double, 3, 1> observation_state;
   // clang-format off
-  observation_state << 2 * (q_1 * q_3 - q_0 * q_2) * grav_acc,
-                       2 * (q_2 * q_3 + q_0 * q_1) * grav_acc,
-                       (q_0 * q_0 - q_1 * q_1 - q_2 * q_2 + q_3 * q_3) * grav_acc,
-                       (q_0 * q_0 + q_1 * q_1 - q_2 * q_2 - q_3 * q_3) * mag_n + 2 * (q_1 * q_3 - q_0 * q_2) * mag_d,
-                       2 * (q_1 * q_2 - q_0 * q_3) * mag_n + 2 * (q_2 * q_3 + q_0 * q_1) * mag_d,
-                       2 * (q_1 * q_3 + q_0 * q_2) * mag_n + (q_0 * q_0 - q_1 * q_1 - q_2 * q_2 + q_3 * q_3) * mag_d;
+  observation_state << 2 * (predicted_state(1) * predicted_state(3) - predicted_state(0) * predicted_state(2)) * grav_acc,
+                       2 * (predicted_state(2) * predicted_state(3) + predicted_state(0) * predicted_state(1)) * grav_acc,
+                       (predicted_state(0) * predicted_state(0) - predicted_state(1) * predicted_state(1) - predicted_state(2) * predicted_state(2) + predicted_state(3) * predicted_state(3)) * grav_acc;
   // clang-format on
   return observation_state;
 }
 
-Matrix<double, 7, 6> Ekf::_get_kalman_gain(const Matrix<double, 6, 7>& observation_jacobian_H,
-                                           const Matrix<double, 7, 7>& predicted_covariance_p) {
-  Matrix<double, 7, 6> kalman_gain;
+Matrix<double, 4, 3> Ekf::_get_kalman_gain(const Matrix<double, 3, 4>& observation_jacobian_H,
+                                           const Matrix<double, 4, 4>& predicted_covariance_p) {
+  Matrix<double, 4, 3> kalman_gain;
   kalman_gain = predicted_covariance_p * observation_jacobian_H.transpose() * (observation_jacobian_H * predicted_covariance_p * observation_jacobian_H.transpose() + _covariance_r).inverse();
   return kalman_gain;
 }
 
-void Ekf::_update_covariance_p(const Matrix<double, 7, 6>& kalman_gain,
-                               const Matrix<double, 6, 7>& observation_jacobian_H,
-                               const Matrix<double, 7, 7>& predicted_covariance_p) {
+void Ekf::_update_covariance_p(const Matrix<double, 4, 3>& kalman_gain,
+                               const Matrix<double, 3, 4>& observation_jacobian_H,
+                               const Matrix<double, 4, 4>& predicted_covariance_p) {
   _covariance_p = predicted_covariance_p - kalman_gain * observation_jacobian_H * predicted_covariance_p;
 }
 
-Matrix<double, 7, 1> Ekf::_get_compensation_state(const Matrix<double, 7, 1>& predicted_state,
-                                                  const Matrix<double, 7, 6>& kalman_gain,
-                                                  const Matrix<double, 6, 1>& acc_geo_sense,
-                                                  const Matrix<double, 6, 1>& observation_state) {
-  Matrix<double, 7, 1> compensation_state;
+Matrix<double, 4, 1> Ekf::_get_compensation_state(const Matrix<double, 4, 1>& predicted_state,
+                                                  const Matrix<double, 4, 3>& kalman_gain,
+                                                  const Matrix<double, 3, 1>& acc_geo_sense,
+                                                  const Matrix<double, 3, 1>& observation_state) {
+  Matrix<double, 4, 1> compensation_state;
   compensation_state = predicted_state + kalman_gain * (acc_geo_sense - observation_state);
   return compensation_state;
 }

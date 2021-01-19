@@ -171,9 +171,9 @@ int main() {
 }
 
 void update_pose() {
-  acc   = bmi088.getAcceleration();
-  gyro  = bmi088.getGyroscope();
-  magne = bmm150.read_mag_data();
+  acc  = bmi088.getAcceleration();
+  gyro = bmi088.getGyroscope();
+  // magne = bmm150.read_mag_data();
   // magne_offset = bmm150.get_offset();
 
   // RPY_kalman_rad = ex_kalman_filter.get_corrected(acc, gyro, magne);

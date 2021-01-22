@@ -11,6 +11,10 @@ using namespace std;
 Ekf::Ekf(double delta_t) {
   this->_delta_t = delta_t;
 
+  _covariance_p = Eigen::Matrix4Xd::Zero(4, 4);
+  _covariance_r = Eigen::Matrix3Xd::Zero(3, 3);
+  _covariance_q = Eigen::Matrix4Xd::Zero(4, 4);
+
   _covariance_q(0)  = 1.00E-6;
   _covariance_q(5)  = 1.00E-6;
   _covariance_q(10) = 1.00E-6;
@@ -57,6 +61,8 @@ geometry_msgs::Quaternion Ekf::get_compensation_state(
   _update_covariance_p(kalman_gain, observation_jacobian_H, predicted_covariance_p);
   Matrix<double, 4, 1> com_quat = _get_compensation_state(predicted_state, kalman_gain, _acc_geo_sense, observation_state);
 
+  _state_value = com_quat;
+
   double quat_norm = sqrt(com_quat(0) * com_quat(0) + com_quat(1) * com_quat(1) + com_quat(2) * com_quat(2) + com_quat(3) * com_quat(3));
 
   geometry_msgs::Quaternion _compensation_quaternion;
@@ -64,6 +70,36 @@ geometry_msgs::Quaternion Ekf::get_compensation_state(
   _compensation_quaternion.x = com_quat(1) / quat_norm;
   _compensation_quaternion.y = com_quat(2) / quat_norm;
   _compensation_quaternion.z = com_quat(3) / quat_norm;
+
+  return _compensation_quaternion;
+}
+
+geometry_msgs::Quaternion Ekf::get_predicted_state(
+  const geometry_msgs::Vector3& linear_acc,
+  const geometry_msgs::Vector3& angular_vel,
+  const geometry_msgs::Vector3& geomagnetism) {
+  // clang-format off
+  Matrix<double, 3, 1> _gyro_sense;
+  _gyro_sense << angular_vel.x,
+                 angular_vel.y,
+                 angular_vel.z;
+
+  Matrix<double, 3, 1> _acc_geo_sense;
+  _acc_geo_sense << linear_acc.x,
+                    linear_acc.y,
+                    linear_acc.z;
+  // clang-format on
+  Matrix<double, 4, 1> predicted_state = _get_predicted_state(_gyro_sense);
+
+  _state_value = predicted_state;
+
+  double quat_norm = sqrt(predicted_state(0) * predicted_state(0) + predicted_state(1) * predicted_state(1) + predicted_state(2) * predicted_state(2) + predicted_state(3) * predicted_state(3));
+
+  geometry_msgs::Quaternion _compensation_quaternion;
+  _compensation_quaternion.w = predicted_state(0) / quat_norm;
+  _compensation_quaternion.x = predicted_state(1) / quat_norm;
+  _compensation_quaternion.y = predicted_state(2) / quat_norm;
+  _compensation_quaternion.z = predicted_state(3) / quat_norm;
 
   return _compensation_quaternion;
 }
@@ -103,10 +139,9 @@ Matrix<double, 4, 4> Ekf::_get_predicted_covariance_p(const Matrix<double, 4, 4>
 
 Matrix<double, 3, 4> Ekf::_get_observation_jacobian_H(const Matrix<double, 4, 1>& predicted_state) {
   Matrix<double, 3, 4> observation_jacobian_H;
-  observation_jacobian_H << predicted_state(2), predicted_state(3), predicted_state(0), predicted_state(1),
-    -predicted_state(1), -predicted_state(0), predicted_state(3), predicted_state(2),
-    predicted_state(0), -predicted_state(1), -predicted_state(2), predicted_state(3);
-  observation_jacobian_H *= 2.0 * grav_acc;
+  observation_jacobian_H << predicted_state(2) * 2.0 * grav_acc, predicted_state(3) * 2.0 * grav_acc, predicted_state(0) * 2.0 * grav_acc, predicted_state(1) * 2.0 * grav_acc,
+    -predicted_state(1) * 2.0 * grav_acc, -predicted_state(0) * 2.0 * grav_acc, predicted_state(3) * 2.0 * grav_acc, predicted_state(2) * 2.0 * grav_acc,
+    predicted_state(0) * 2.0 * grav_acc, -predicted_state(1) * 2.0 * grav_acc, -predicted_state(2) * 2.0 * grav_acc, predicted_state(3) * 2.0 * grav_acc;
 
   return observation_jacobian_H;
 }

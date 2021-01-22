@@ -26,7 +26,7 @@ void tf_kalman_publish(const geometry_msgs::Quaternion& quat) {
 int main(int argc, char** argv) {
   ros::init(argc, argv, "quat_publisher_to_tf");
   ros::NodeHandle nh;
-  ros::Subscriber RPY_kalman_sub = nh.subscribe("/pred_quat", 1000, tf_kalman_publish);
+  ros::Subscriber RPY_kalman_sub = nh.subscribe("/quat", 1000, tf_kalman_publish);
   ros::Rate loop_rate(10);
   while (ros::ok()) {
     ros::spinOnce();

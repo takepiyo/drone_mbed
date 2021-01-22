@@ -209,11 +209,16 @@ include_directories(
 # catkin_add_nosetests(test)
 add_executable(joy_state_publisher src/joy_state_publisher.cpp)
 add_executable(pose_publisher_to_tf src/pose_publisher_to_tf.cpp)
+add_executable(quat_publisher_to_tf src/quat_publisher_to_tf.cpp)
 
 target_link_libraries(joy_state_publisher
   ${catkin_LIBRARIES}
 )
 
 target_link_libraries(pose_publisher_to_tf
+${catkin_LIBRARIES}
+)
+
+target_link_libraries(quat_publisher_to_tf
 ${catkin_LIBRARIES}
 )

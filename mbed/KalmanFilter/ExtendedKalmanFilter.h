@@ -15,6 +15,11 @@ public:
     const geometry_msgs::Vector3 &angular_vel,
     const geometry_msgs::Vector3 &geomagnetism);
 
+  geometry_msgs::Quaternion get_predicted_state(
+    const geometry_msgs::Vector3 &linear_acc,
+    const geometry_msgs::Vector3 &angular_vel,
+    const geometry_msgs::Vector3 &geomagnetism);
+
 private:
   double _delta_t;
 

@@ -139,18 +139,18 @@ Matrix<double, 4, 4> Ekf::_get_predicted_covariance_p(const Matrix<double, 4, 4>
 
 Matrix<double, 3, 4> Ekf::_get_observation_jacobian_H(const Matrix<double, 4, 1>& predicted_state) {
   Matrix<double, 3, 4> observation_jacobian_H;
-  observation_jacobian_H << predicted_state(2) * 2.0 * grav_acc, predicted_state(3) * 2.0 * grav_acc, predicted_state(0) * 2.0 * grav_acc, predicted_state(1) * 2.0 * grav_acc,
-    -predicted_state(1) * 2.0 * grav_acc, -predicted_state(0) * 2.0 * grav_acc, predicted_state(3) * 2.0 * grav_acc, predicted_state(2) * 2.0 * grav_acc,
-    predicted_state(0) * 2.0 * grav_acc, -predicted_state(1) * 2.0 * grav_acc, -predicted_state(2) * 2.0 * grav_acc, predicted_state(3) * 2.0 * grav_acc;
+  observation_jacobian_H << -predicted_state(2), predicted_state(3), -predicted_state(0), predicted_state(1),
+    predicted_state(1), predicted_state(0), predicted_state(3), predicted_state(2),
+    predicted_state(0), -predicted_state(1), -predicted_state(2), predicted_state(3);
 
-  return observation_jacobian_H;
+  return observation_jacobian_H * 2.0 * grav_acc;
 }
 
 Matrix<double, 3, 1> Ekf::_get_observation_state(const Matrix<double, 4, 1>& predicted_state) {
   Matrix<double, 3, 1> observation_state;
   // clang-format off
-  observation_state << 2 * (predicted_state(1) * predicted_state(3) + predicted_state(0) * predicted_state(2)) * grav_acc,
-                       2 * (predicted_state(2) * predicted_state(3) - predicted_state(0) * predicted_state(1)) * grav_acc,
+  observation_state << 2 * (predicted_state(1) * predicted_state(3) - predicted_state(0) * predicted_state(2)) * grav_acc,
+                       2 * (predicted_state(2) * predicted_state(3) + predicted_state(0) * predicted_state(1)) * grav_acc,
                        (predicted_state(0) * predicted_state(0) - predicted_state(1) * predicted_state(1) - predicted_state(2) * predicted_state(2) + predicted_state(3) * predicted_state(3)) * grav_acc;
   // clang-format on
   return observation_state;

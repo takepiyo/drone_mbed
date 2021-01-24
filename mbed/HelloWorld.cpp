@@ -60,17 +60,11 @@ ros::Publisher rotate_magne_pub("rotate_magne", &rotate_magne);
 geometry_msgs::Vector3 magne_offset;
 ros::Publisher magne_offset_pub("magne_offset", &magne_offset);
 
-geometry_msgs::Vector3 test;
-ros::Publisher test_pub("test", &test);
-
 geometry_msgs::Quaternion quat;
 ros::Publisher quat_pub("quat", &quat);
 
 geometry_msgs::Quaternion pred_quat;
 ros::Publisher pred_quat_pub("pred_quat", &pred_quat);
-
-geometry_msgs::Vector3 rpy;
-ros::Publisher rpy_pub("RPY_kalman_rad", &rpy);
 
 // void publish_string(string message)
 // {
@@ -100,27 +94,6 @@ void init_mbed() {
   led3 = 0;
   led4 = 0;
   while (1) {
-    if (bmm150.initialize() == BMM150_E_ID_NOT_CONFORM) {
-      led4 = !led4;
-      wait_ms(200);
-    } else {
-      led4 = 1;
-      if (DO_CALIB) {
-        wait_ms(1000);
-        led4 = 0;
-        for (int i = 0; i < 10; i++) {
-          led4 = !led4;
-          wait_ms(10);
-        }
-        led4 = 1;
-        bmm150.calibration();
-        led4 = 0;
-        wait_ms(3000);
-      }
-      break;
-    }
-  }
-  while (1) {
     if (bmi088.isConnection()) {
       bmi088.initialize();
       led3 = 1;
@@ -140,17 +113,10 @@ void init_ros() {
 
   nh.initNode();
   // nh.advertise(duties_pub);
-  // nh.advertise(debugger);
   nh.advertise(acc_pub);
   nh.advertise(gyro_pub);
-  // nh.advertise(magne_pub);
-  // nh.advertise(rotate_magne_pub);
-  // nh.advertise(magne_offset_pub);
   nh.advertise(quat_pub);
   nh.advertise(pred_quat_pub);
-  nh.advertise(rpy_pub);
-  // nh.advertise(test_pub);
-  // nh.subscribe(duties_sub);
 }
 
 int main() {
@@ -170,8 +136,6 @@ int main() {
     // magne_offset_pub.publish(&magne_offset);
     quat_pub.publish(&quat);
     pred_quat_pub.publish(&pred_quat);
-    rpy_pub.publish(&rpy);
-    // test_pub.publish(&test);
     nh.spinOnce();
     __enable_irq();  // 許可
     wait(PERIOD);
@@ -184,13 +148,5 @@ void update_pose() {
   acc  = bmi088.getAcceleration();
   gyro = bmi088.getGyroscope();
 
-  quat = ex_kalman_filter.get_compensation_state(acc, gyro, magne);
-  // rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
-}
-
-void rad_to_deg(const geometry_msgs::Vector3 &radian,
-                geometry_msgs::Vector3 &degree) {
-  degree.x = (radian.x * 180) / 3.1415;
-  degree.y = (radian.y * 180) / 3.1415;
-  degree.z = (radian.z * 180) / 3.1415;
+  quat = ex_kalman_filter.get_compensation_state(acc, gyro);
 }

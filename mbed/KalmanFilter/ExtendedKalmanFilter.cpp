@@ -24,10 +24,10 @@ Ekf::Ekf(double delta_t) {
   _covariance_r(4) = 2.0;
   _covariance_r(8) = 2.0;
 
-  _covariance_q(0)  = 0.5;
-  _covariance_q(5)  = 0.5;
-  _covariance_q(10) = 0.5;
-  _covariance_q(15) = 0.5;
+  _covariance_p(0)  = 0.5;
+  _covariance_p(5)  = 0.5;
+  _covariance_p(10) = 0.5;
+  _covariance_p(15) = 0.5;
 
   grav_acc = 9.79;
 
@@ -38,8 +38,7 @@ Ekf::~Ekf() {}
 
 geometry_msgs::Quaternion Ekf::get_compensation_state(
   const geometry_msgs::Vector3& linear_acc,
-  const geometry_msgs::Vector3& angular_vel,
-  const geometry_msgs::Vector3& geomagnetism) {
+  const geometry_msgs::Vector3& angular_vel) {
   // clang-format off
   Matrix<double, 3, 1> _gyro_sense;
   _gyro_sense << angular_vel.x,
@@ -70,36 +69,6 @@ geometry_msgs::Quaternion Ekf::get_compensation_state(
   _compensation_quaternion.x = com_quat(1) / quat_norm;
   _compensation_quaternion.y = com_quat(2) / quat_norm;
   _compensation_quaternion.z = com_quat(3) / quat_norm;
-
-  return _compensation_quaternion;
-}
-
-geometry_msgs::Quaternion Ekf::get_predicted_state(
-  const geometry_msgs::Vector3& linear_acc,
-  const geometry_msgs::Vector3& angular_vel,
-  const geometry_msgs::Vector3& geomagnetism) {
-  // clang-format off
-  Matrix<double, 3, 1> _gyro_sense;
-  _gyro_sense << angular_vel.x,
-                 angular_vel.y,
-                 angular_vel.z;
-
-  Matrix<double, 3, 1> _acc_geo_sense;
-  _acc_geo_sense << linear_acc.x,
-                    linear_acc.y,
-                    linear_acc.z;
-  // clang-format on
-  Matrix<double, 4, 1> predicted_state = _get_predicted_state(_gyro_sense);
-
-  _state_value = predicted_state;
-
-  double quat_norm = sqrt(predicted_state(0) * predicted_state(0) + predicted_state(1) * predicted_state(1) + predicted_state(2) * predicted_state(2) + predicted_state(3) * predicted_state(3));
-
-  geometry_msgs::Quaternion _compensation_quaternion;
-  _compensation_quaternion.w = predicted_state(0) / quat_norm;
-  _compensation_quaternion.x = predicted_state(1) / quat_norm;
-  _compensation_quaternion.y = predicted_state(2) / quat_norm;
-  _compensation_quaternion.z = predicted_state(3) / quat_norm;
 
   return _compensation_quaternion;
 }

@@ -12,13 +12,7 @@ public:
   ~Ekf();
   geometry_msgs::Quaternion get_compensation_state(
     const geometry_msgs::Vector3 &linear_acc,
-    const geometry_msgs::Vector3 &angular_vel,
-    const geometry_msgs::Vector3 &geomagnetism);
-
-  geometry_msgs::Quaternion get_predicted_state(
-    const geometry_msgs::Vector3 &linear_acc,
-    const geometry_msgs::Vector3 &angular_vel,
-    const geometry_msgs::Vector3 &geomagnetism);
+    const geometry_msgs::Vector3 &angular_vel);
 
 private:
   double _delta_t;

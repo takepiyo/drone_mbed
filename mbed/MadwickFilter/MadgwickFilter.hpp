@@ -70,7 +70,7 @@ public:
     @param  val ロール，ピッチ，ヨーの順に配列に格納します．３つ以上の要素の配列を入れてください．
     @note   値は[rad]です．[degree]に変換が必要な場合は別途計算して下さい．
     */
-  void getEulerAngle(float *val);
+  void getEulerAngle(double *roll, double *pitch, double *yaw);
 
 public:
   Timer madgwickTimer;
@@ -105,11 +105,11 @@ void MadgwickFilter::getAttitude(double *_q0, double *_q1, double *_q2, double *
   return;
 }
 
-void MadgwickFilter::getEulerAngle(float *val) {
-  float q0q0 = q0 * q0, q1q1q2q2 = q1 * q1 - q2 * q2, q3q3 = q3 * q3;
-  val[0] = (atan2(2.0f * (q0 * q1 + q2 * q3), q0q0 - q1q1q2q2 + q3q3));
-  val[1] = (-asin(2.0f * (q1 * q3 - q0 * q2)));
-  val[2] = (atan2(2.0f * (q1 * q2 + q0 * q3), q0q0 + q1q1q2q2 - q3q3));
+void MadgwickFilter::getEulerAngle(double *roll, double *pitch, double *yaw) {
+  double q0q0 = q0 * q0, q1q1q2q2 = q1 * q1 - q2 * q2, q3q3 = q3 * q3;
+  *roll  = (atan2(2.0f * (q0 * q1 + q2 * q3), q0q0 - q1q1q2q2 + q3q3));
+  *pitch = (-asin(2.0f * (q1 * q3 - q0 * q2)));
+  *yaw   = (atan2(2.0f * (q1 * q2 + q0 * q3), q0q0 + q1q1q2q2 - q3q3));
 }
 //---------------------------------------------------------------------------------------------------
 // AHRS algorithm update

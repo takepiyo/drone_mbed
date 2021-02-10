@@ -78,17 +78,8 @@ ros::Publisher no_filter_obse_pub("no_filter_obse", &no_filter_obse);
 geometry_msgs::Quaternion quat;
 ros::Publisher quat_pub("quat", &quat);
 
-geometry_msgs::Vector3 test;
-ros::Publisher test_pub("test", &test);
-
-// void publish_string(string message)
-// {
-//     int length = message.length();
-//     char char_array[length + 1];
-//     strcpy(char_array, message.c_str());
-//     echo.data = char_array;
-//     debugger.publish(&echo);
-// }
+geometry_msgs::Vector3 eular;
+ros::Publisher eular_pub("eular", &eular);
 
 void update_duties(const std_msgs::Float32 &input_duties) {
   duties = input_duties;
@@ -160,7 +151,7 @@ void init_ros() {
   // nh.advertise(no_filter_pred_pub);
   // nh.advertise(no_filter_obse_pub);
   nh.advertise(quat_pub);
-  nh.advertise(test_pub);
+  nh.advertise(eular_pub);
   // nh.subscribe(duties_sub);
 }
 
@@ -173,18 +164,9 @@ int main() {
   timer.attach(&update_pose, PERIOD);
   while (1) {
     __disable_irq();  // 禁止
-    // update_motor_rotation();
-    // acc_pub.publish(&acc);
-    // gyro_pub.publish(&gyro);
     mag_pub.publish(&mag);
-    // rotate_magne_pub.publish(&rotate_magne);
-    // magne_offset_pub.publish(&magne_offset);
-    // RPY_pub_kalman_deg.publish(&RPY_kalman_deg);
-    // RPY_pub_kalman_rad.publish(&RPY_kalman_rad);
-    // no_filter_pred_pub.publish(&no_filter_pred);
-    // no_filter_obse_pub.publish(&no_filter_obse);
     quat_pub.publish(&quat);
-    test_pub.publish(&test);
+    test_pub.publish(&eular);
     nh.spinOnce();
     __enable_irq();  // 許可
     wait(PERIOD);
@@ -201,31 +183,5 @@ void update_pose() {
 
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
   madgwickfilter.getAttitude(&quat.w, &quat.x, &quat.y, &quat.z);
-
-  // RPY_kalman_rad = ex_kalman_filter.get_corrected(acc, gyro, magne);
-  // no_filter_pred = ex_kalman_filter.get_predicted_value_no_filter();
-  // no_filter_obse = ex_kalman_filter.get_observation_no_filter();
-
-  // rad_to_deg(RPY_kalman_rad, RPY_kalman_deg);
-  get_dealed_roll_pitch_magne(acc);
-}
-
-void rad_to_deg(const geometry_msgs::Vector3 &radian,
-                geometry_msgs::Vector3 &degree) {
-  degree.x = (radian.x * 180) / 3.1415;
-  degree.y = (radian.y * 180) / 3.1415;
-  degree.z = (radian.z * 180) / 3.1415;
-}
-
-void get_dealed_roll_pitch_magne(geometry_msgs::Vector3 &accel) {
-  float roll  = std::atan2(accel.y, accel.z);
-  float pitch = std::atan2(-accel.x, std::hypot(accel.y, accel.z));
-
-  rotate_magne.x = std::cos(pitch) * mag.x + std::sin(pitch) * std::sin(roll) * mag.y + std::sin(pitch) * std::cos(roll) * mag.z;
-  rotate_magne.y = std::cos(roll) * mag.y - std::sin(roll) * mag.z;
-  rotate_magne.z = -std::sin(pitch) * mag.x + std::cos(pitch) * std::sin(roll) * mag.y + std::cos(pitch) * std::cos(roll) * mag.z;
-
-  test.x = rotate_magne.x;
-  test.y = -rotate_magne.y;
-  test.z = std::atan2(-rotate_magne.y, rotate_magne.x);
+  madgwickfilter.getgetEulerAngle(&eular.x, &eular.y, &eular.z);
 }

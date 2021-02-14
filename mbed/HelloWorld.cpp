@@ -62,7 +62,6 @@ void update_motor_rotation() {
   motor[1].update(duties.data);
   motor[2].update(duties.data);
   motor[3].update(duties.data);
-  duties_pub.publish(&duties);
 }
 ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_duties);
 
@@ -131,6 +130,9 @@ void update_pose() {
   acc  = bmi088.getAcceleration();
   gyro = bmi088.getGyroscope();
   mag  = bmm150.read_mag_data();
+
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
   madgwickfilter.getAttitude(&quat.w, &quat.x, &quat.y, &quat.z);
+
+  update_motor_rotation();
 }

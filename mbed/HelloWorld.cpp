@@ -46,7 +46,6 @@ Ticker timer;
 
 // ros variables
 ros::NodeHandle nh;
-// std_msgs::Float32MultiArray duties;
 std_msgs::Float32 duties;
 ros::Publisher duties_pub("now_duty", &duties);
 
@@ -92,7 +91,7 @@ void update_motor_rotation() {
   motor[2].update(duties.data);
   motor[3].update(duties.data);
   // motor.update(duties.data);
-  duties_pub.publish(&duties);
+  // duties_pub.publish(&duties);
 }
 ros::Subscriber<std_msgs::Float32> duties_sub("input_duties", &update_duties);
 
@@ -130,9 +129,6 @@ void init_mbed() {
     wait_ms(200);
   }
   led3 = 1;
-
-  geometry_msgs::Vector3 init_yaw = bmm150.read_mag_data();
-  // ex_kalman_filter.init_yaw(init_yaw);
 }
 
 void init_ros() {
@@ -152,7 +148,7 @@ void init_ros() {
   // nh.advertise(no_filter_obse_pub);
   nh.advertise(quat_pub);
   nh.advertise(eular_pub);
-  // nh.subscribe(duties_sub);
+  nh.subscribe(duties_sub);
 }
 
 int main() {
@@ -163,10 +159,10 @@ int main() {
   // publish_stri ng("start loop!");
   timer.attach(&update_pose, PERIOD);
   while (1) {
+    update_motor_rotation();
     __disable_irq();  // 禁止
     mag_pub.publish(&mag);
     quat_pub.publish(&quat);
-    test_pub.publish(&eular);
     nh.spinOnce();
     __enable_irq();  // 許可
     wait(PERIOD);
@@ -179,9 +175,7 @@ void update_pose() {
   acc  = bmi088.getAcceleration();
   gyro = bmi088.getGyroscope();
   mag  = bmm150.read_mag_data();
-  // magne_offset = bmm150.get_offset();
 
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
   madgwickfilter.getAttitude(&quat.w, &quat.x, &quat.y, &quat.z);
-  madgwickfilter.getgetEulerAngle(&eular.x, &eular.y, &eular.z);
 }

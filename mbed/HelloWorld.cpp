@@ -12,6 +12,7 @@
 #include <std_msgs/Float32.h>
 
 #include <geometry_msgs/Accel.h>
+#include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Vector3.h>
 
@@ -50,11 +51,14 @@ ros::Publisher gyro_pub("gyro", &gyro);
 geometry_msgs::Vector3 mag;
 ros::Publisher mag_pub("mag", &mag);
 
-std_msgs::Float32 z_sensor;
-ros::Publisher z_sensor_pub("z_sensor", &z_sensor);
+// std_msgs::Float32 z_sensor;
+// ros::Publisher z_sensor_pub("z_sensor", &z_sensor);
 
-geometry_msgs::Quaternion quat;
-ros::Publisher quat_pub("quat", &quat);
+// geometry_msgs::Quaternion quat;
+// ros::Publisher quat_pub("quat", &quat);
+
+geometry_msgs::Pose pose;
+ros::Publisher pose_pub("pose", &pose);
 
 void update_duties(const std_msgs::Float32 &input_duties) {
   duties = input_duties;
@@ -109,8 +113,9 @@ void init_ros() {
   duties.data = 0.0;
 
   nh.initNode();
-  nh.advertise(quat_pub);
-  nh.advertise(z_sensor_pub);
+  nh.advertise(pose_pub);
+  // nh.advertise(quat_pub);
+  // nh.advertise(z_sensor_pub);
   nh.subscribe(duties_sub);
 }
 
@@ -122,8 +127,9 @@ int main() {
   timer.attach(&update_pose, PERIOD);
   while (1) {
     __disable_irq();  // 禁止
-    quat_pub.publish(&quat);
-    z_sensor_pub.publish(&z_sensor);
+    // quat_pub.publish(&quat);
+    pose_pub.publish(&pose);
+    // z_sensor_pub.publish(&z_sensor);
     nh.spinOnce();
     __enable_irq();  // 許可
     wait(PERIOD);
@@ -133,13 +139,13 @@ int main() {
 }
 
 void update_pose() {
-  acc           = bmi088.getAcceleration();
-  gyro          = bmi088.getGyroscope();
-  mag           = bmm150.read_mag_data();
-  z_sensor.data = rf.read_m();
+  acc             = bmi088.getAcceleration();
+  gyro            = bmi088.getGyroscope();
+  mag             = bmm150.read_mag_data();
+  pose.position.z = rf.read_m();
 
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
-  madgwickfilter.getAttitude(&quat.w, &quat.x, &quat.y, &quat.z);
+  madgwickfilter.getAttitude(&pose.orientation.w, &pose.orientation.x, &pose.orientation.y, &pose.orientation.z);
 
   update_motor_rotation();
 }

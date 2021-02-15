@@ -6,6 +6,7 @@
 #include "bmm150_defs.h"
 
 #include <MadgwickFilter.hpp>
+#include "RangeFinder.h"
 
 #include <ros.h>
 #include <std_msgs/Float32.h>
@@ -34,7 +35,7 @@ Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
 BMM150 bmm150(p9, p10);
 BMI088 bmi088(p9, p10, PERIOD);
 MadgwickFilter madgwickfilter;
-
+RangeFinder rf(p21, 10, 5800.0, 100000);
 Ticker timer;
 
 // ros variables
@@ -48,6 +49,9 @@ geometry_msgs::Vector3 gyro;
 ros::Publisher gyro_pub("gyro", &gyro);
 geometry_msgs::Vector3 mag;
 ros::Publisher mag_pub("mag", &mag);
+
+std_msgs::Float32 z_sensor;
+ros::Publisher z_sensor_pub("z_sensor", &z_sensor);
 
 geometry_msgs::Quaternion quat;
 ros::Publisher quat_pub("quat", &quat);
@@ -106,6 +110,7 @@ void init_ros() {
 
   nh.initNode();
   nh.advertise(quat_pub);
+  nh.advertise(z_sensor_pub);
   nh.subscribe(duties_sub);
 }
 
@@ -118,6 +123,7 @@ int main() {
   while (1) {
     __disable_irq();  // 禁止
     quat_pub.publish(&quat);
+    z_sensor_pub.publish(&z_sensor);
     nh.spinOnce();
     __enable_irq();  // 許可
     wait(PERIOD);
@@ -127,9 +133,10 @@ int main() {
 }
 
 void update_pose() {
-  acc  = bmi088.getAcceleration();
-  gyro = bmi088.getGyroscope();
-  mag  = bmm150.read_mag_data();
+  acc           = bmi088.getAcceleration();
+  gyro          = bmi088.getGyroscope();
+  mag           = bmm150.read_mag_data();
+  z_sensor.data = rf.read_m();
 
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
   madgwickfilter.getAttitude(&quat.w, &quat.x, &quat.y, &quat.z);

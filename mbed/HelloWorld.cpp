@@ -23,7 +23,10 @@
 #define PERIOD 0.01
 #define DO_CALIB 0
 
-void update_duty(const std_msgs::Float32 &input_duty);
+void update_duty_0(const std_msgs::Float32 &input_duty);
+void update_duty_1(const std_msgs::Float32 &input_duty);
+void update_duty_2(const std_msgs::Float32 &input_duty);
+void update_duty_3(const std_msgs::Float32 &input_duty);
 void update_motor_rotation();
 void mixing_duty();
 void init_mbed();
@@ -52,7 +55,10 @@ Ticker timer;
 ros::NodeHandle nh;
 geometry_msgs::Quaternion duty;  //  output duty  [w x y z] correspond motor [0 1 2 3]
 ros::Publisher duty_pub("corrent_duty", &duty);
-ros::Subscriber<std_msgs::Float32> duty_sub("input_duty", &update_duty);
+ros::Subscriber<std_msgs::Float32> duty_0_sub("input_duty_0", &update_duty_0);
+ros::Subscriber<std_msgs::Float32> duty_1_sub("input_duty_1", &update_duty_1);
+ros::Subscriber<std_msgs::Float32> duty_2_sub("input_duty_2", &update_duty_2);
+ros::Subscriber<std_msgs::Float32> duty_3_sub("input_duty_3", &update_duty_3);
 
 geometry_msgs::Vector3 acc;
 ros::Publisher acc_pub("acc", &acc);
@@ -67,12 +73,24 @@ ros::Publisher pose_pub("pose", &pose_stamped);
 geometry_msgs::QuaternionStamped mixed_duty;  // [z roll pitch yaw] depend [w x y z]
 ros::Publisher mixed_duty_pub("mixed_duty", &mixed_duty);
 
-void update_duty(const std_msgs::Float32 &input_duty) {
+void update_duty_0(const std_msgs::Float32 &input_duty) {
   duty.w = input_duty.data;
+  led4   = 0;
+}
+
+void update_duty_1(const std_msgs::Float32 &input_duty) {
   duty.x = input_duty.data;
+  led4   = 1;
+}
+
+void update_duty_2(const std_msgs::Float32 &input_duty) {
   duty.y = input_duty.data;
+  led3   = 0;
+}
+
+void update_duty_3(const std_msgs::Float32 &input_duty) {
   duty.z = input_duty.data;
-  led4   = !led4;
+  led3   = 1;
 }
 
 void update_motor_rotation() {
@@ -152,7 +170,10 @@ void init_ros() {
   nh.advertise(pose_pub);
   nh.advertise(duty_pub);
   nh.advertise(mixed_duty_pub);
-  nh.subscribe(duty_sub);
+  nh.subscribe(duty_0_sub);
+  nh.subscribe(duty_1_sub);
+  nh.subscribe(duty_2_sub);
+  nh.subscribe(duty_3_sub);
 }
 
 int main() {

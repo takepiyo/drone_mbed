@@ -168,7 +168,7 @@ void init_mbed() {
 void init_ros() {
   nh.initNode();
   nh.advertise(pose_pub);
-  nh.advertise(duty_pub);
+  // nh.advertise(duty_pub);
   nh.advertise(mixed_duty_pub);
   nh.subscribe(duty_0_sub);
   nh.subscribe(duty_1_sub);
@@ -184,7 +184,7 @@ int main() {
   timer.attach(&update_pose, PERIOD);
   while (1) {
     __disable_irq();  // 禁止
-    duty_pub.publish(&duty);
+    // duty_pub.publish(&duty);
     mixed_duty_pub.publish(&mixed_duty);
     pose_pub.publish(&pose_stamped);
     nh.spinOnce();
@@ -200,9 +200,10 @@ void update_pose() {
   gyro = bmi088.getGyroscope();
   mag  = bmm150.read_mag_data();
 
-  pose_stamped.pose.position.z = rf.read_m();
+  // pose_stamped.pose.position.z = rf.read_m();
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
   madgwickfilter.getAttitude(&pose_stamped.pose.orientation.w, &pose_stamped.pose.orientation.x, &pose_stamped.pose.orientation.y, &pose_stamped.pose.orientation.z);
+  // pose_stamped.pose.position.z = (pose_stamped.pose.orientation.w * pose_stamped.pose.orientation.w - pose_stamped.pose.orientation.x * pose_stamped.pose.orientation.x - pose_stamped.pose.orientation.y * pose_stamped.pose.orientation.y + pose_stamped.pose.orientation.z * pose_stamped.pose.orientation.z) * pose_stamped.pose.position.z;
   pose_stamped.header.stamp = nh.now();
   update_motor_rotation();
 }

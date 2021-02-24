@@ -99,17 +99,28 @@ end
 
 min_size = 2274;
 
+all_pose_time = all_pose_time(2: min_size+1, 1);
+all_roll = all_roll(1: min_size, 1);
+all_duty_time = all_duty_time(1: min_size, 1);
+all_roll_duty = all_roll_duty(1: min_size, 1);
+all_pose_time = all_pose_time(1: min_size, 1);
+all_pitch = all_pitch(1: min_size, 1);
+all_duty_time = all_duty_time(1: min_size, 1);
+all_pitch_duty = all_pitch_duty(1: min_size, 1);
+
 %plot(pose_time_mat, roll_mat)
-plot(all_pose_time(1: min_size, 1), all_roll(1: min_size, 1))
+plot(all_pose_time, all_roll)
 hold on
 %plot(mixed_time_mat, mixed_roll_mat)
-plot(all_duty_time(1: min_size, 1), all_roll_duty(1: min_size, 1))
+plot(all_duty_time, all_roll_duty)
 legend('roll', 'duty')
 
 figure()
 %plot(pose_time_mat, pitch_mat)
-plot(all_pose_time(1: min_size, 1), all_pitch(1: min_size, 1))
+plot(all_pose_time, all_pitch)
 hold on
 %plot(mixed_time_mat, mixed_pitch_mat)
-plot(all_duty_time(1: min_size, 1), all_pitch_duty(1: min_size, 1))
+plot(all_duty_time, all_pitch_duty)
 legend('pitch', 'duty')
+
+

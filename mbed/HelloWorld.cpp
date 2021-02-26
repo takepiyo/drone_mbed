@@ -1,5 +1,7 @@
 #include "mbed.h"
 
+#include <PIDController.h>
+
 #include <BMI088.h>
 #include <Esc.h>
 #include <bmm150.h>
@@ -11,27 +13,52 @@
 #include "RangeFinder.h"
 
 #include <ros.h>
+#include <std_msgs/Empty.h>
 #include <std_msgs/Float32.h>
 
-#include <geometry_msgs/Accel.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/QuaternionStamped.h>
 #include <geometry_msgs/Vector3.h>
+#include <geometry_msgs/Vector3Stamped.h>
 
 #define MOTOR_NUM 4
 #define PERIOD 0.01
 #define DO_CALIB 0
+#define LIMIT_DUTY 0.5
 
-void update_duty_0(const std_msgs::Float32 &input_duty);
-void update_duty_1(const std_msgs::Float32 &input_duty);
-void update_duty_2(const std_msgs::Float32 &input_duty);
-void update_duty_3(const std_msgs::Float32 &input_duty);
+//PIDController variables
+const float control_period = 0.0769;
+
+const PIDController::Param roll_controller_param = {
+  .P = 4.5578,
+  .I = 4.2896,
+  .D = 0.16891,
+};
+
+const PIDController::Param pitch_controller_param = {
+  .P = -4.4182,
+  .I = -21.646,
+  .D = -0.13788,
+};
+
+PIDController roll_pid_controller(control_period, roll_controller_param);
+PIDController pitch_pid_controller(control_period, pitch_controller_param);
+
+// function
+void update_ref_z(const std_msgs::Float32 &ref_z);
+void update_ref_roll(const std_msgs::Float32 &ref_roll);
+void update_ref_pitch(const std_msgs::Float32 &ref_pitch);
+void update_ref_yaw(const std_msgs::Float32 &ref_yaw);
+double cap(double duty);
 void update_motor_rotation();
-void mixing_duty();
+// void mixing_duty();
 void init_mbed();
 void init_ros();
-void update_pose();
+void update_control_input();
+void unmixing_duty();
+void update_control_loop();
+void emergency_stop(const std_msgs::Empty &toggle);
 Eigen::Matrix<double, 4, 1> ros_to_eigen(geometry_msgs::Quaternion &input);
 geometry_msgs::Quaternion eigen_to_ros(Eigen::Matrix<double, 4, 1> &input);
 
@@ -43,7 +70,8 @@ DigitalOut led4 = LED4;
 
 Esc motor[MOTOR_NUM] = {p25, p24, p22, p23};
 
-Eigen::Matrix<double, 4, 4> mix_duty_mat;
+// Eigen::Matrix<double, 4, 4> mix_duty_mat;
+Eigen::Matrix<double, 4, 4> unmix_duty_mat;
 
 BMM150 bmm150(p9, p10);
 BMI088 bmi088(p9, p10, PERIOD);
@@ -54,11 +82,15 @@ Ticker timer;
 // ros variables
 ros::NodeHandle nh;
 geometry_msgs::Quaternion duty;  //  output duty  [w x y z] correspond motor [0 1 2 3]
-ros::Publisher duty_pub("corrent_duty", &duty);
-ros::Subscriber<std_msgs::Float32> duty_0_sub("input_duty_0", &update_duty_0);
-ros::Subscriber<std_msgs::Float32> duty_1_sub("input_duty_1", &update_duty_1);
-ros::Subscriber<std_msgs::Float32> duty_2_sub("input_duty_2", &update_duty_2);
-ros::Subscriber<std_msgs::Float32> duty_3_sub("input_duty_3", &update_duty_3);
+ros::Publisher duty_pub("current_duty", &duty);
+geometry_msgs::Quaternion ref_zrpy;                   //  reference:  [w x y z] correspond ref throttle roll pitch yaw
+geometry_msgs::QuaternionStamped control_input_zrpy;  //  control amount:  [w x y z] correspond ref throttle roll pitch yaw
+ros::Publisher control_input_pub("control_input", &control_input_zrpy);
+ros::Subscriber<std_msgs::Float32> z_sub("ref_z", &update_ref_z);
+ros::Subscriber<std_msgs::Float32> roll_sub("ref_roll", &update_ref_roll);
+ros::Subscriber<std_msgs::Float32> pitch_sub("ref_pitch", &update_ref_pitch);
+ros::Subscriber<std_msgs::Float32> yaw_sub("ref_yaw", &update_ref_yaw);
+ros::Subscriber<std_msgs::Empty> emergency_stop_sub("emergency_stop", &emergency_stop);
 
 geometry_msgs::Vector3 acc;
 ros::Publisher acc_pub("acc", &acc);
@@ -67,45 +99,64 @@ ros::Publisher gyro_pub("gyro", &gyro);
 geometry_msgs::Vector3 mag;
 ros::Publisher mag_pub("mag", &mag);
 
-geometry_msgs::PoseStamped pose_stamped;
-ros::Publisher pose_pub("pose", &pose_stamped);
+geometry_msgs::Vector3Stamped eular;
+ros::Publisher eular_pub("pose", &eular);
 
-geometry_msgs::QuaternionStamped mixed_duty;  // [z roll pitch yaw] depend [w x y z]
-ros::Publisher mixed_duty_pub("mixed_duty", &mixed_duty);
+// geometry_msgs::QuaternionStamped mixed_duty;  // [z roll pitch yaw] depend [w x y z]
+// ros::Publisher mixed_duty_pub("mixed_duty", &mixed_duty);
 
-void update_duty_0(const std_msgs::Float32 &input_duty) {
-  duty.w = input_duty.data;
-  led4   = 0;
+void update_ref_z(const std_msgs::Float32 &ref_z) {
+  ref_zrpy.w = ref_z.data;
+  led4       = 0;
 }
 
-void update_duty_1(const std_msgs::Float32 &input_duty) {
-  duty.x = input_duty.data;
-  led4   = 1;
+void update_ref_roll(const std_msgs::Float32 &ref_roll) {
+  ref_zrpy.x = ref_roll.data;
+  led4       = 1;
 }
 
-void update_duty_2(const std_msgs::Float32 &input_duty) {
-  duty.y = input_duty.data;
-  led3   = 0;
+void update_ref_pitch(const std_msgs::Float32 &ref_pitch) {
+  ref_zrpy.y = ref_pitch.data;
+  led3       = 0;
 }
 
-void update_duty_3(const std_msgs::Float32 &input_duty) {
-  duty.z = input_duty.data;
-  led3   = 1;
+void update_ref_yaw(const std_msgs::Float32 &ref_yaw) {
+  ref_zrpy.z = ref_yaw.data;
+  led3       = 1;
+}
+
+void update_control_input() {
+  control_input_zrpy.quaternion.w = ref_zrpy.w;
+  control_input_zrpy.quaternion.x = roll_pid_controller.update(ref_zrpy.x, eular.vector.x);
+  control_input_zrpy.quaternion.y = pitch_pid_controller.update(ref_zrpy.y, eular.vector.y);
+  control_input_zrpy.quaternion.z = ref_zrpy.z;
 }
 
 void update_motor_rotation() {
-  motor[0].update(duty.w);
-  motor[1].update(duty.x);
-  motor[2].update(duty.y);
-  motor[3].update(duty.z);
-  mixing_duty();
+  unmixing_duty();
+  control_input_zrpy.header.stamp = nh.now();
+  motor[0].update(cap(duty.w));
+  motor[1].update(cap(duty.x));
+  motor[2].update(cap(duty.y));
+  motor[3].update(cap(duty.z));
+  // mixing_duty();
 }
 
-void mixing_duty() {
-  mixed_duty.header.stamp = nh.now();
+// void mixing_duty() {
+//   mixed_duty.header.stamp = nh.now();
 
-  Eigen::Matrix<double, 4, 1> mixed = mix_duty_mat * ros_to_eigen(duty);
-  mixed_duty.quaternion             = eigen_to_ros(mixed);
+//   Eigen::Matrix<double, 4, 1> mixed = mix_duty_mat * ros_to_eigen(duty);
+//   mixed_duty.quaternion             = eigen_to_ros(mixed);
+// }
+
+void unmixing_duty() {
+  Eigen::Matrix<double, 4, 1> input_duty = unmix_duty_mat * ros_to_eigen(control_input_zrpy.quaternion);
+
+  duty = eigen_to_ros(input_duty);
+}
+
+double cap(double duty) {
+  return std::min(duty, LIMIT_DUTY);
 }
 
 Eigen::Matrix<double, 4, 1> ros_to_eigen(geometry_msgs::Quaternion &input) {
@@ -158,22 +209,27 @@ void init_mbed() {
   }
   led3 = 1;
   // clang-format off
-  mix_duty_mat << 1.0, 1.0, 1.0, 1.0,
-                  -1.0, 1.0, 1.0, -1.0,
-                  -1.0, -1.0, 1.0, 1.0,
-                  -1.0, 1.0, -1.0, 1.0;
+  // mix_duty_mat << 1.0, 1.0, 1.0, 1.0,
+  //                 -1.0, 1.0, 1.0, -1.0,
+  //                 -1.0, -1.0, 1.0, 1.0,
+  //                 -1.0, 1.0, -1.0, 1.0;
+  unmix_duty_mat << 0.25, -0.25, -0.25, -0.25,
+                    0.25, 0.25, -0.25, 0.25,
+                    0.25, 0.25, 0.25, -0.25,
+                    0.25, -0.25, 0.25, 0.25;
   // clang-format on
 }
 
 void init_ros() {
   nh.initNode();
-  nh.advertise(pose_pub);
-  // nh.advertise(duty_pub);
-  nh.advertise(mixed_duty_pub);
-  nh.subscribe(duty_0_sub);
-  nh.subscribe(duty_1_sub);
-  nh.subscribe(duty_2_sub);
-  nh.subscribe(duty_3_sub);
+  nh.advertise(eular_pub);
+  nh.advertise(duty_pub);
+  nh.advertise(control_input_pub);
+  nh.subscribe(z_sub);
+  nh.subscribe(roll_sub);
+  nh.subscribe(pitch_sub);
+  nh.subscribe(yaw_sub);
+  nh.subscribe(emergency_stop_sub);
 }
 
 int main() {
@@ -181,12 +237,12 @@ int main() {
   init_ros();
   init_mbed();
   led1 = 1;
-  timer.attach(&update_pose, PERIOD);
+  timer.attach(&update_control_loop, PERIOD);
   while (1) {
     __disable_irq();  // 禁止
-    // duty_pub.publish(&duty);
-    mixed_duty_pub.publish(&mixed_duty);
-    pose_pub.publish(&pose_stamped);
+    duty_pub.publish(&duty);
+    control_input_pub.publish(&control_input_zrpy);
+    eular_pub.publish(&eular);
     nh.spinOnce();
     __enable_irq();  // 許可
     wait(PERIOD);
@@ -195,15 +251,22 @@ int main() {
   return 0;
 }
 
-void update_pose() {
+void update_control_loop() {
   acc  = bmi088.getAcceleration();
   gyro = bmi088.getGyroscope();
   mag  = bmm150.read_mag_data();
 
-  // pose_stamped.pose.position.z = rf.read_m();
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
-  madgwickfilter.getAttitude(&pose_stamped.pose.orientation.w, &pose_stamped.pose.orientation.x, &pose_stamped.pose.orientation.y, &pose_stamped.pose.orientation.z);
-  // pose_stamped.pose.position.z = (pose_stamped.pose.orientation.w * pose_stamped.pose.orientation.w - pose_stamped.pose.orientation.x * pose_stamped.pose.orientation.x - pose_stamped.pose.orientation.y * pose_stamped.pose.orientation.y + pose_stamped.pose.orientation.z * pose_stamped.pose.orientation.z) * pose_stamped.pose.position.z;
-  pose_stamped.header.stamp = nh.now();
+  madgwickfilter.getEulerAngle(&eular.vector.x, &eular.vector.y, &eular.vector.z);
+  eular.header.stamp = nh.now();
+  update_control_input();
   update_motor_rotation();
+}
+
+void emergency_stop(const std_msgs::Empty &toggle) {
+  timer.detach();
+  motor[0].update(0.0);
+  motor[1].update(0.0);
+  motor[2].update(0.0);
+  motor[3].update(0.0);
 }

@@ -4,8 +4,8 @@
     <param name="port" value="/dev/ttyUSB0"/>
     <param name="baud" value="115200"/>
   </node>
-  <arg name="model" default="$(find drone_mbed)/urdf/simple_drone.urdf" />
-  <arg name="rvizconfig" default="$(find drone_mbed)/rviz/simple_drone.rviz" />
+  <arg name="model" default="$(find drone_mbed)/urdf/drone.urdf" />
+  <arg name="rvizconfig" default="$(find drone_mbed)/rviz/drone.rviz" />
   <arg name="joy" default="false" />
   <param name="robot_description" command="$(find xacro)/xacro.py $(arg model)" />
 
@@ -14,7 +14,7 @@
     <node name="joy_state_publisher" pkg="drone_mbed" type="joy_state_publisher" />
   </group>
 
-  <node name="pose_publisher_to_tf" pkg="drone_mbed" type="pose_publisher_to_tf" />
+  <node name="rpy_publisher_to_tf" pkg="drone_mbed" type="rpy_publisher_to_tf" />
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
 </launch>

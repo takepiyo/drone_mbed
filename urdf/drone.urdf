@@ -4,9 +4,9 @@
 
   <joint name="base_joint_kalman" type="floating">
     <parent link="world"/>
-    <child link="quat_drone"/>
+    <child link="drone"/>
   </joint>
-  <link name="quat_drone">
+  <link name="drone">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>

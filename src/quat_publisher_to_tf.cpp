@@ -1,4 +1,5 @@
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/QuaternionStamped.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <geometry_msgs/Vector3.h>
 #include <ros/ros.h>
@@ -6,7 +7,7 @@
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 
-void tf_pose_publish(const geometry_msgs::PoseStamped& pose_stamped) {
+void tf_pose_publish(const geometry_msgs::QuaternionStamped& pose_stamped) {
   static tf2_ros::TransformBroadcaster br;
   geometry_msgs::TransformStamped transformstamped;
 
@@ -15,12 +16,12 @@ void tf_pose_publish(const geometry_msgs::PoseStamped& pose_stamped) {
   transformstamped.child_frame_id          = "quat_drone";
   transformstamped.transform.translation.x = 0.0;
   transformstamped.transform.translation.y = 0.0;
-  transformstamped.transform.translation.z = pose_stamped.pose.position.z;
+  transformstamped.transform.translation.z = 1.0;
 
-  transformstamped.transform.rotation.w = pose_stamped.pose.orientation.w;
-  transformstamped.transform.rotation.x = pose_stamped.pose.orientation.x;
-  transformstamped.transform.rotation.y = pose_stamped.pose.orientation.y;
-  transformstamped.transform.rotation.z = pose_stamped.pose.orientation.z;
+  transformstamped.transform.rotation.w = pose_stamped.quaternion.w;
+  transformstamped.transform.rotation.x = pose_stamped.quaternion.x;
+  transformstamped.transform.rotation.y = pose_stamped.quaternion.y;
+  transformstamped.transform.rotation.z = pose_stamped.quaternion.z;
   br.sendTransform(transformstamped);
 }
 

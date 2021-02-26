@@ -16,6 +16,7 @@ std_msgs::Float32 ref_yaw;
 ros::Publisher ref_yaw_pub;
 std_msgs::Empty toggle;
 ros::Publisher emergency_stop_pub;
+ros::Publisher start_control_pub;
 ros::Subscriber joy_sub;
 
 void joy_callback(const sensor_msgs::Joy& joy_msg) {
@@ -23,7 +24,8 @@ void joy_callback(const sensor_msgs::Joy& joy_msg) {
   ref_roll.data  = joy_msg.axes[3];
   ref_pitch.data = joy_msg.axes[4];
   ref_yaw.data   = joy_msg.axes[0];
-  if (joy_msg.buttons[0] == 1 && joy_msg.buttons[1] == 1) { emergency_stop_pub.publish(toggle); }
+  if (joy_msg.buttons[11] == 1 && joy_msg.buttons[12] == 1) { emergency_stop_pub.publish(toggle); }
+  if (joy_msg.axes[2] < -0.5 && joy_msg.axes[5] < -0.5) { start_control_pub.publish(toggle); }
 }
 
 int main(int argc, char** argv) {
@@ -34,6 +36,7 @@ int main(int argc, char** argv) {
   ref_pitch_pub      = nh.advertise<std_msgs::Float32>("ref_pitch", 1000);
   ref_yaw_pub        = nh.advertise<std_msgs::Float32>("ref_yaw", 1000);
   emergency_stop_pub = nh.advertise<std_msgs::Empty>("emergency_stop", 1000);
+  start_control_pub  = nh.advertise<std_msgs::Empty>("stable", 1000);
   joy_sub            = nh.subscribe("joy", 1000, joy_callback);
 
   ros::Rate loop_rate(10);

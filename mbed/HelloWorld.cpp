@@ -24,8 +24,8 @@
 
 #define MOTOR_NUM 4
 #define PERIOD 0.01
-#define DO_CALIB 0
 #define LIMIT_DUTY 0.5
+#define IF_STABLE 0.001
 
 //PIDController variables
 const float control_period = 0.0769;
@@ -59,8 +59,12 @@ void update_control_input();
 void unmixing_duty();
 void update_control_loop();
 void emergency_stop(const std_msgs::Empty &toggle);
+void control_start(const std_msgs::Empty &toggle);
 Eigen::Matrix<double, 4, 1> ros_to_eigen(geometry_msgs::Quaternion &input);
 geometry_msgs::Quaternion eigen_to_ros(Eigen::Matrix<double, 4, 1> &input);
+
+// check pose stable
+bool stable = false;
 
 // mbed variables
 DigitalOut led1 = LED1;
@@ -91,6 +95,7 @@ ros::Subscriber<std_msgs::Float32> roll_sub("ref_roll", &update_ref_roll);
 ros::Subscriber<std_msgs::Float32> pitch_sub("ref_pitch", &update_ref_pitch);
 ros::Subscriber<std_msgs::Float32> yaw_sub("ref_yaw", &update_ref_yaw);
 ros::Subscriber<std_msgs::Empty> emergency_stop_sub("emergency_stop", &emergency_stop);
+ros::Subscriber<std_msgs::Empty> check_stable_sub("stable", &control_start);
 
 geometry_msgs::Vector3 acc;
 ros::Publisher acc_pub("acc", &acc);
@@ -183,18 +188,6 @@ void init_mbed() {
       wait_ms(200);
     } else {
       led4 = 1;
-      if (DO_CALIB) {
-        wait_ms(1000);
-        led4 = 0;
-        for (int i = 0; i < 10; i++) {
-          led4 = !led4;
-          wait_ms(10);
-        }
-        led4 = 1;
-        bmm150.calibration();
-        led4 = 0;
-        wait_ms(3000);
-      }
       break;
     }
   }
@@ -230,13 +223,13 @@ void init_ros() {
   nh.subscribe(pitch_sub);
   nh.subscribe(yaw_sub);
   nh.subscribe(emergency_stop_sub);
+  nh.subscribe(check_stable_sub);
 }
 
 int main() {
   led1 = 0;
   init_ros();
   init_mbed();
-  led1 = 1;
   timer.attach(&update_control_loop, PERIOD);
   while (1) {
     __disable_irq();  // 禁止
@@ -259,8 +252,10 @@ void update_control_loop() {
   madgwickfilter.MadgwickAHRSupdate(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, mag.x, mag.y, mag.z);
   madgwickfilter.getEulerAngle(&eular.vector.x, &eular.vector.y, &eular.vector.z);
   eular.header.stamp = nh.now();
-  update_control_input();
-  update_motor_rotation();
+  if (stable) {
+    update_control_input();
+    update_motor_rotation();
+  }
 }
 
 void emergency_stop(const std_msgs::Empty &toggle) {
@@ -269,4 +264,10 @@ void emergency_stop(const std_msgs::Empty &toggle) {
   motor[1].update(0.0);
   motor[2].update(0.0);
   motor[3].update(0.0);
+  led1 = 0;
+}
+
+void control_start(const std_msgs::Empty &toggle) {
+  stable = true;
+  led1   = 1;
 }

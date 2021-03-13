@@ -24,22 +24,23 @@
 
 #define MOTOR_NUM 4
 #define PERIOD 0.01
-#define LIMIT_DUTY 0.5
+#define LIMIT_DUTY 0.7
+#define OFFSET_DUTY 0.15
 #define IF_STABLE 0.001
 
 //PIDController variables
 const float control_period = 0.0769;
 
 const PIDController::Param roll_controller_param = {
-  .P = 4.5578,
-  .I = 4.2896,
-  .D = 0.16891,
+  .P = 0.4,
+  .I = 0.0,
+  .D = 1.9,
 };
 
 const PIDController::Param pitch_controller_param = {
-  .P = -4.4182,
-  .I = -21.646,
-  .D = -0.13788,
+  .P = 0.85,
+  .I = 0.0,
+  .D = 4.25,
 };
 
 PIDController roll_pid_controller(control_period, roll_controller_param);
@@ -51,6 +52,7 @@ void update_ref_roll(const std_msgs::Float32 &ref_roll);
 void update_ref_pitch(const std_msgs::Float32 &ref_pitch);
 void update_ref_yaw(const std_msgs::Float32 &ref_yaw);
 double cap(double duty);
+double offset(double duty);
 void update_motor_rotation();
 // void mixing_duty();
 void init_mbed();
@@ -140,10 +142,10 @@ void update_control_input() {
 void update_motor_rotation() {
   unmixing_duty();
   control_input_zrpy.header.stamp = nh.now();
-  motor[0].update(cap(duty.w));
-  motor[1].update(cap(duty.x));
-  motor[2].update(cap(duty.y));
-  motor[3].update(cap(duty.z));
+  motor[0].update(cap(offset(duty.w)));
+  motor[1].update(cap(offset(duty.x)));
+  motor[2].update(cap(offset(duty.y)));
+  motor[3].update(cap(offset(duty.z)));
   // mixing_duty();
 }
 
@@ -162,6 +164,10 @@ void unmixing_duty() {
 
 double cap(double duty) {
   return std::min(duty, LIMIT_DUTY);
+}
+
+double offset(double duty) {
+  return duty + OFFSET_DUTY;
 }
 
 Eigen::Matrix<double, 4, 1> ros_to_eigen(geometry_msgs::Quaternion &input) {

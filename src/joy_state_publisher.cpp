@@ -20,9 +20,9 @@ ros::Publisher start_control_pub;
 ros::Subscriber joy_sub;
 
 void joy_callback(const sensor_msgs::Joy& joy_msg) {
-  ref_z.data     = joy_msg.axes[1];
-  ref_roll.data  = joy_msg.axes[3];
-  ref_pitch.data = joy_msg.axes[4];
+  ref_z.data     = joy_msg.axes[1] * 2.0;
+  ref_roll.data  = joy_msg.axes[3] / 10.0;
+  ref_pitch.data = joy_msg.axes[4] / 10.0;
   ref_yaw.data   = joy_msg.axes[0];
   if (joy_msg.buttons[11] == 1 && joy_msg.buttons[12] == 1) { emergency_stop_pub.publish(toggle); }
   if (joy_msg.axes[2] < -0.5 && joy_msg.axes[5] < -0.5) { start_control_pub.publish(toggle); }

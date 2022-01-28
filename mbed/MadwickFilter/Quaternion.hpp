@@ -5,6 +5,7 @@
 * クォータニオンの足し，引き，掛け算などを簡単にできるようになります．
 * @author  Gaku MATSUMOTO
 * @bref  クォータニオンを使えるクラスです．
+* https://os.mbed.com/teams/PQ_Hybrid_Electrical_Equipment_Team/code/Quaternion//file/0b4374931b0e/Vector3.lib/
 */
 
 class Quaternion {

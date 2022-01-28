@@ -5,6 +5,10 @@
 #ifndef _VECTOR3_HPP_
 #define _VECTOR3_HPP_
 
+/**
+ * https://os.mbed.com/users/Gaku0606/code/Vector3/
+*/
+
 class Vector3 {
 public:
   Vector3() {
